@@ -1,0 +1,319 @@
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
+import { useAuth } from '../context/useAuth';
+import Button from './Button';
+
+/**
+ * Editorial SignupForm Component
+ * Full registration flow with password strength calculation,
+ * password matching confirmation, terms validation, and instant demo quick register.
+ */
+export default function SignupForm() {
+  const { signup, demoLogin, isLoading } = useAuth();
+  const navigate = useNavigate();
+
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(true);
+  const [error, setError] = useState('');
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
+
+  // Compute password strength
+  const calculateStrength = (pwd) => {
+    if (!pwd) return { score: 0, label: 'None', color: 'none' };
+    let score = 0;
+    if (pwd.length >= 8) score += 1;
+    if (pwd.length >= 12) score += 1;
+    if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score += 1;
+    if (/[0-9]/.test(pwd) || /[^A-Za-z0-9]/.test(pwd)) score += 1;
+
+    switch (score) {
+      case 1:
+        return { score: 1, label: 'Weak', class: 'pg-strength-weak' };
+      case 2:
+        return { score: 2, label: 'Fair', class: 'pg-strength-fair' };
+      case 3:
+        return { score: 3, label: 'Good', class: 'pg-strength-good' };
+      case 4:
+        return { score: 4, label: 'Strong', class: 'pg-strength-strong' };
+      default:
+        return { score: 0, label: 'Weak', class: 'pg-strength-weak' };
+    }
+  };
+
+  const strength = calculateStrength(password);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!name.trim()) {
+      setError('Please provide your full name.');
+      return;
+    }
+
+    if (!email.trim() || !email.includes('@')) {
+      setError('Please provide a valid work email address.');
+      return;
+    }
+
+    if (!password || password.length < 8) {
+      setError('Password must contain at least 8 characters.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Password confirmation does not match.');
+      return;
+    }
+
+    if (!agreeTerms) {
+      setError('You must accept the terms of service and demonstration disclosure.');
+      return;
+    }
+
+    try {
+      await signup({ name, email, password });
+      navigate('/app/dashboard');
+    } catch (err) {
+      setError(err.message || 'Registration failed.');
+    }
+  };
+
+  const handleDemoQuickRegister = async () => {
+    setError('');
+    try {
+      await demoLogin();
+      navigate('/app/dashboard');
+    } catch {
+      setError('Unable to initialize demo account.');
+    }
+  };
+
+  return (
+    <div className="pg-signup-form-root">
+      {/* Demo Notification Banner */}
+      <div className="pg-auth-demo-banner" role="status">
+        <div className="pg-auth-demo-header">
+          <Sparkles size={14} className="pg-text-cream" />
+          <span>Local Demonstration Account</span>
+        </div>
+        <p className="pg-auth-demo-desc">
+          Signups are saved to your browser session. Backend Supabase/OAuth registration connects in subsequent milestones.
+        </p>
+      </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="pg-auth-error-banner" role="alert">
+          <AlertCircle size={16} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="pg-auth-form" noValidate>
+        {/* Full Name */}
+        <div className="pg-auth-field">
+          <label htmlFor="signup-name" className="pg-auth-label">
+            Full Name
+          </label>
+          <input
+            id="signup-name"
+            type="text"
+            className="pg-auth-input"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError('');
+            }}
+            placeholder="e.g. Sarah Connor"
+            autoComplete="name"
+            required
+          />
+        </div>
+
+        {/* Work Email */}
+        <div className="pg-auth-field">
+          <label htmlFor="signup-email" className="pg-auth-label">
+            Corporate / Work Email
+          </label>
+          <input
+            id="signup-email"
+            type="email"
+            className="pg-auth-input"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError('');
+            }}
+            placeholder="name@company.com"
+            autoComplete="email"
+            required
+          />
+        </div>
+
+        {/* Password */}
+        <div className="pg-auth-field">
+          <label htmlFor="signup-password" className="pg-auth-label">
+            Password (min. 8 characters)
+          </label>
+          <div className="pg-auth-password-wrap">
+            <input
+              id="signup-password"
+              type={showPassword ? 'text' : 'password'}
+              className="pg-auth-input pg-input-with-icon"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError('');
+              }}
+              placeholder="••••••••••••"
+              autoComplete="new-password"
+              required
+            />
+            <button
+              type="button"
+              className="pg-password-toggle-btn"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+
+          {/* Password Strength Meter */}
+          {password && (
+            <div className="pg-strength-container" aria-live="polite">
+              <div className="pg-strength-bars">
+                {[1, 2, 3, 4].map((bar) => (
+                  <div
+                    key={bar}
+                    className={`pg-strength-bar ${
+                      strength.score >= bar ? strength.class : ''
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="pg-strength-label">
+                Strength: <strong>{strength.label}</strong>
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Confirm Password */}
+        <div className="pg-auth-field">
+          <label htmlFor="signup-confirm-password" className="pg-auth-label">
+            Confirm Password
+          </label>
+          <input
+            id="signup-confirm-password"
+            type={showPassword ? 'text' : 'password'}
+            className="pg-auth-input"
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              setError('');
+            }}
+            placeholder="••••••••••••"
+            autoComplete="new-password"
+            required
+          />
+        </div>
+
+        {/* Terms & Conditions Checkbox */}
+        <div className="pg-auth-checkbox-row">
+          <label className="pg-auth-checkbox-label">
+            <input
+              type="checkbox"
+              className="pg-auth-checkbox"
+              checked={agreeTerms}
+              onChange={(e) => setAgreeTerms(e.target.checked)}
+            />
+            <span>
+              I accept the{' '}
+              <button
+                type="button"
+                className="pg-terms-modal-trigger"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setTermsModalOpen(true);
+                }}
+              >
+                Demonstration Terms &amp; Privacy Policy
+              </button>
+            </span>
+          </label>
+        </div>
+
+        {/* Submit Button */}
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          isLoading={isLoading}
+          iconAfter={ArrowRight}
+          className="pg-w-full"
+        >
+          Create Workspace Account
+        </Button>
+
+        {/* 1-Click Demo Shortcut */}
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          icon={Sparkles}
+          onClick={handleDemoQuickRegister}
+          disabled={isLoading}
+          className="pg-w-full pg-mt-3"
+        >
+          Demo Quick Access (Skip Form)
+        </Button>
+      </form>
+
+      {/* Switch to Login */}
+      <div className="pg-auth-switch-prompt">
+        <span>Already have an account?</span>{' '}
+        <Link to="/login" className="pg-auth-switch-link">
+          Sign in
+        </Link>
+      </div>
+
+      {/* Terms Modal */}
+      {termsModalOpen && (
+        <div className="pg-modal-backdrop" onClick={() => setTermsModalOpen(false)}>
+          <div
+            className="pg-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="pg-modal-header">
+              <h3>Demonstration Terms of Service</h3>
+            </div>
+            <div className="pg-modal-body">
+              <p>
+                PrivacyGuard AI is currently provided as a local demonstration frontend. All user accounts,
+                passwords, and session tokens are simulated within your browser storage.
+              </p>
+              <p>
+                No personally identifiable information is sent to external servers during this demo preview.
+                Live NLP entity extraction models and database persistence connect in Milestones 2 and 3.
+              </p>
+            </div>
+            <div className="pg-modal-footer">
+              <Button variant="primary" size="sm" onClick={() => setTermsModalOpen(false)}>
+                Understood
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
