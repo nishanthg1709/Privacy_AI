@@ -38,6 +38,64 @@ class AuthService {
   /**
    * Check whether a real Supabase session exists on initial boot / page refresh
    */
+  /**
+   * Fetch user profile from public.profiles table
+   */
+  async getProfile(userId) {
+    if (!this.isCloudConfigured() || !supabase || !userId) {
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, display_name, created_at, updated_at')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('[PrivacyGuard AI] Supabase profile fetch failed:', error.message);
+        return null;
+      }
+      return data;
+    } catch (err) {
+      console.warn('[PrivacyGuard AI] Exception fetching profile:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Update authenticated user profile in public.profiles table
+   * Strictly enforces that user ID is never changed.
+   */
+  async updateProfile(userId, { displayName }) {
+    if (!this.isCloudConfigured() || !supabase || !userId) {
+      throw new Error('Supabase client is not available or user is not logged in.');
+    }
+
+    const cleanName = (displayName || '').trim();
+    if (!cleanName) {
+      throw new Error('Display name cannot be empty.');
+    }
+
+    // Only update display_name; id is immutable and verified by RLS
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ display_name: cleanName })
+      .eq('id', userId)
+      .select('id, display_name, created_at, updated_at')
+      .single();
+
+    if (error) {
+      throw new Error(error.message || 'Failed to update profile.');
+    }
+
+    return data;
+  }
+
+  /**
+   * Check whether a real Supabase session exists on initial boot / page refresh
+   */
   async getInitialSession() {
     if (!this.isCloudConfigured() || !supabase) {
       return null;
@@ -51,7 +109,8 @@ class AuthService {
       }
 
       if (data?.session?.user) {
-        return this._mapSupabaseUser(data.session.user);
+        const profile = await this.getProfile(data.session.user.id);
+        return this._mapSupabaseUser(data.session.user, false, profile);
       }
     } catch (err) {
       console.warn('[PrivacyGuard AI] Session verification error:', err);
@@ -89,7 +148,8 @@ class AuthService {
       throw new Error('No user data returned from Supabase authentication.');
     }
 
-    return this._mapSupabaseUser(data.user);
+    const profile = await this.getProfile(data.user.id);
+    return this._mapSupabaseUser(data.user, false, profile);
   }
 
   /**
@@ -118,6 +178,7 @@ class AuthService {
         data: {
           full_name: cleanName,
           name: cleanName,
+          display_name: cleanName,
           organization: 'Enterprise Workspace',
           role: 'Privacy Administrator',
         },
@@ -151,21 +212,27 @@ class AuthService {
 
   // --- Private Helpers ---
 
-  _mapSupabaseUser(sbUser, emailConfirmationPending = false) {
+  _mapSupabaseUser(sbUser, emailConfirmationPending = false, profileData = null) {
     if (!sbUser) return null;
     const meta = sbUser.user_metadata || {};
+    const displayName =
+      profileData?.display_name ||
+      meta.full_name ||
+      meta.name ||
+      meta.display_name ||
+      (sbUser.email ? sbUser.email.split('@')[0] : 'Workspace User');
+
     return {
       id: sbUser.id,
       email: sbUser.email,
-      name:
-        meta.full_name ||
-        meta.name ||
-        (sbUser.email ? sbUser.email.split('@')[0] : 'Workspace User'),
+      name: displayName,
+      displayName,
       organization: meta.organization || 'Enterprise Workspace',
       role: meta.role || 'Privacy Administrator',
-      joinedDate: sbUser.created_at
-        ? sbUser.created_at.split('T')[0]
+      joinedDate: (profileData?.created_at || sbUser.created_at)
+        ? (profileData?.created_at || sbUser.created_at).split('T')[0]
         : new Date().toISOString().split('T')[0],
+      updatedAt: profileData?.updated_at || sbUser.updated_at || null,
       emailConfirmationPending,
     };
   }

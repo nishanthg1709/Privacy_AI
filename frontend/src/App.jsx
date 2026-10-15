@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard';
 import PrivacyScanner from './pages/PrivacyScanner';
 import Results from './pages/Results';
 import ScanHistory from './pages/ScanHistory';
+import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 
 /**
@@ -240,6 +241,15 @@ function AppContent() {
               isLoadingHistory={isLoadingHistory}
               cloudSyncError={cloudSyncError}
               isCloud={isCloudActive}
+            />
+          }
+        />
+        <Route
+          path="analytics"
+          element={
+            <Analytics
+              scanHistory={scanHistory}
+              onSelectScan={handleSelectScanForInspection}
             />
           }
         />

@@ -3,14 +3,15 @@ import SignupForm from '../components/SignupForm';
 
 /**
  * Dedicated SignupPage Component
+ * Matches Panel 3 of the reference design:
+ * - Split layout: registration card on left, monumental security gateway on right
  */
 export default function SignupPage() {
   return (
     <AuthLayout
-      title="Create account."
-      subtitle="Establish a secure local workspace to test real-time PII interception and anonymization."
-      sideQuote="Protect confidential context before the prompt leaves your perimeter."
-      sideAuthor="Enterprise Data Minimization Manifesto"
+      title="Create Your Account"
+      subtitle="Get started with privacy-first AI protection."
+      variant="split"
     >
       <SignupForm />
     </AuthLayout>

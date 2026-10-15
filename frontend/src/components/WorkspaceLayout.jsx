@@ -5,12 +5,13 @@ import {
   Shield,
   Scan,
   LogOut,
-  Info,
   X,
   CheckCircle2,
   AlertCircle,
   Home,
-  ChevronDown
+  ChevronDown,
+  Search,
+  Bell
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Button from './Button';
@@ -33,6 +34,8 @@ export default function WorkspaceLayout({
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showSpecsModal, setShowSpecsModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [notifOpen, setNotifOpen] = useState(false);
 
   // Compute active page id from pathname
   const currentPath = location.pathname;
@@ -40,11 +43,19 @@ export default function WorkspaceLayout({
   if (currentPath.includes('/scanner')) currentPageId = 'scanner';
   else if (currentPath.includes('/results')) currentPageId = 'results';
   else if (currentPath.includes('/history')) currentPageId = 'history';
+  else if (currentPath.includes('/analytics')) currentPageId = 'analytics';
   else if (currentPath.includes('/settings')) currentPageId = 'settings';
 
   const handleNavigate = (pageId) => {
     navigate(`/app/${pageId}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate('/app/history', { state: { search: searchQuery.trim() } });
+    }
   };
 
   const handleLogout = () => {
@@ -90,16 +101,66 @@ export default function WorkspaceLayout({
               <span className="pg-crumb-tenant">Workspace</span>
               <span className="pg-crumb-sep">/</span>
               <span className="pg-crumb-current">
-                {currentPageId === 'dashboard' && 'Telemetry Dashboard'}
-                {currentPageId === 'scanner' && 'Privacy Scanner Studio'}
-                {currentPageId === 'results' && 'Inspection & Diff Preview'}
-                {currentPageId === 'history' && 'Audit Log Records'}
-                {currentPageId === 'settings' && 'Guardrail Policies'}
+                {currentPageId === 'dashboard' && 'Your Workspace'}
+                {currentPageId === 'scanner' && 'Privacy Scanner'}
+                {currentPageId === 'results' && 'Scan Results'}
+                {currentPageId === 'history' && 'Scan History'}
+                {currentPageId === 'analytics' && 'Analytics'}
+                {currentPageId === 'settings' && 'Settings'}
               </span>
             </div>
           </div>
 
+          <div className="pg-topbar-center pg-hide-mobile">
+            {/* Real Search Bar matching reference Panel 4 */}
+            <form onSubmit={handleSearchSubmit} className="pg-topbar-search-form">
+              <Search size={15} className="pg-search-icon" />
+              <input
+                type="text"
+                placeholder="Search anything..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pg-topbar-search-input"
+                aria-label="Search scan history"
+              />
+            </form>
+          </div>
+
           <div className="pg-topbar-right">
+            {/* Notification Bell matching reference */}
+            <div className="pg-notif-wrap">
+              <button
+                type="button"
+                className="pg-topbar-icon-btn"
+                onClick={() => setNotifOpen(!notifOpen)}
+                aria-label="Notifications"
+                title="Notifications"
+              >
+                <Bell size={17} />
+              </button>
+
+              {notifOpen && (
+                <>
+                  <div className="pg-dropdown-backdrop" onClick={() => setNotifOpen(false)} />
+                  <div className="pg-notif-dropdown" role="region" aria-label="Notifications list">
+                    <div className="pg-notif-header">
+                      <span className="pg-notif-title">Notifications</span>
+                      <span className="pg-mono-badge">System</span>
+                    </div>
+                    <div className="pg-notif-content">
+                      <div className="pg-notif-item">
+                        <CheckCircle2 size={14} />
+                        <div>
+                          <p className="pg-notif-text">GLiNER + Presidio engine active</p>
+                          <span className="pg-notif-time">In-memory CPU inference ready</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             {currentPageId !== 'scanner' && (
               <Button
                 variant="primary"
@@ -111,17 +172,6 @@ export default function WorkspaceLayout({
               </Button>
             )}
 
-            {/* Architecture Specs Trigger */}
-            <button
-              type="button"
-              className="pg-topbar-specs-pill"
-              onClick={() => setShowSpecsModal(true)}
-              title="Architecture details"
-            >
-              <Info size={14} />
-              <span className="pg-hide-mobile">System Specs</span>
-            </button>
-
             {/* User Dropdown Menu */}
             <div className="pg-user-dropdown-wrap">
               <button
@@ -132,11 +182,10 @@ export default function WorkspaceLayout({
                 aria-label="User account menu"
               >
                 <div className="pg-user-avatar">
-                  {user?.name ? user.name.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'U')}
+                  {user?.name ? user.name.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'N')}
                 </div>
                 <div className="pg-user-menu-text pg-hide-mobile">
-                  <span className="pg-user-menu-name">{user?.name || (user?.email ? user.email.split('@')[0] : 'Security Officer')}</span>
-                  <span className="pg-user-menu-role">{user?.role || 'Security Officer'}</span>
+                  <span className="pg-user-menu-name">{user?.name || (user?.email ? user.email.split('@')[0] : 'Nishanth')}</span>
                 </div>
                 <ChevronDown size={14} className="pg-text-cream-subtle" />
               </button>

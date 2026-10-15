@@ -1,16 +1,15 @@
 import {
-  LayoutDashboard,
+  Home,
   Scan,
   History,
+  BarChart3,
   FileCheck2,
   Settings,
   Shield,
   X,
-  Activity,
   LogOut,
-  ArrowLeft,
   ChevronRight,
-  Info
+  HelpCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -31,10 +30,10 @@ export default function Sidebar({
   const navItems = [
     {
       id: 'dashboard',
-      label: 'Dashboard',
-      icon: LayoutDashboard,
+      label: 'Home',
+      icon: Home,
       badge: null,
-      description: 'Telemetry & pipeline metrics',
+      description: 'Overview & quick actions',
     },
     {
       id: 'scanner',
@@ -56,13 +55,19 @@ export default function Sidebar({
       id: 'history',
       label: 'Scan History',
       icon: History,
-      badge: '6 logs',
-      badgeColor: 'subtle',
+      badge: null,
       description: 'Verifiable audit records',
     },
     {
+      id: 'analytics',
+      label: 'Analytics',
+      icon: BarChart3,
+      badge: null,
+      description: 'Usage & category telemetry',
+    },
+    {
       id: 'settings',
-      label: 'Policy Settings',
+      label: 'Settings',
       icon: Settings,
       badge: null,
       description: 'Minimization defaults',
@@ -161,35 +166,35 @@ export default function Sidebar({
           </ul>
         </nav>
 
-        {/* Sidebar Footer */}
+        {/* Sidebar Footer matching reference panel 4 */}
         <div className="pg-sidebar-footer">
-          {/* Quick Exit to Public Landing Page */}
-          <Link to="/" className="pg-sidebar-exit-link">
-            <ArrowLeft size={14} />
-            <span>Public Landing Page</span>
-          </Link>
-
-          {/* Engine Status Card */}
-          <div className="pg-engine-card">
-            <div className="pg-engine-header">
-              <Activity size={14} className="pg-engine-icon" />
-              <span className="pg-engine-title">Local Engine Pipeline</span>
-            </div>
-            <div className="pg-engine-status-pill">GLiNER + Presidio</div>
-            <p className="pg-engine-hint">Neural Contextual &amp; Pattern Detectors</p>
+          <div className="pg-sidebar-utility-links">
             {onShowSpecs && (
               <button
                 type="button"
-                className="pg-engine-info-btn"
+                className="pg-sidebar-util-btn"
                 onClick={onShowSpecs}
+                title="PrivacyGuard AI Architecture & Help"
               >
-                <Info size={12} />
-                <span>Architecture Specs</span>
+                <HelpCircle size={16} />
+                <span>Help</span>
+              </button>
+            )}
+
+            {onLogout && (
+              <button
+                type="button"
+                className="pg-sidebar-util-btn pg-util-logout"
+                onClick={onLogout}
+                title="Sign out of workspace session"
+              >
+                <LogOut size={16} />
+                <span>Log Out</span>
               </button>
             )}
           </div>
 
-          {/* User Profile Bar with Logout */}
+          {/* User Profile Bar */}
           <div className="pg-sidebar-user-card">
             <div className="pg-user-avatar">
               {user?.name ? user.name.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'U')}
@@ -198,17 +203,6 @@ export default function Sidebar({
               <span className="pg-user-name">{user?.name || (user?.email ? user.email.split('@')[0] : 'Security Officer')}</span>
               <span className="pg-user-role">{user?.role || 'Security Officer'}</span>
             </div>
-            {onLogout && (
-              <button
-                type="button"
-                className="pg-sidebar-logout-btn"
-                onClick={onLogout}
-                title="Sign out of session"
-                aria-label="Log out"
-              >
-                <LogOut size={15} />
-              </button>
-            )}
           </div>
         </div>
       </aside>

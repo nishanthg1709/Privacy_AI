@@ -4,25 +4,26 @@ import {
   ShieldCheck,
   AlertTriangle,
   ArrowRight,
-  Search,
   Eye,
   History,
-  Sliders,
-  CheckCircle2,
-  Lock,
-  Sparkles,
+  BarChart3,
+  Settings,
   ChevronRight,
   Terminal,
-  Activity
+  FileText,
+  Sparkles
 } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import Button from '../components/Button';
+import dashboardTechImg from '../assets/dashboard-workspace-tech.jpg';
 
 /**
  * Editorial Dashboard Page
- * Executive overview of privacy guardrails and real-time session telemetry.
- * Strictly calculates metrics from actual scans performed in this session.
- * Never fabricates historical scans or fake privacy scores.
+ * Matches Panel 4 of the reference design:
+ * - Welcome Back, Your Workspace hero banner with laptop security artwork
+ * - 4 Workspace Action Cards: New Scan, Scan History, Analytics, Settings
+ * - Real activity and statistics strictly derived from actual scans
+ * - Truthful empty state when no scans exist
  */
 export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], isCloud = false }) {
   const navigate = useNavigate();
@@ -67,25 +68,16 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
 
   return (
     <div className="pg-editorial-workspace-page">
-      {/* Editorial Hero Banner */}
-      <section className="pg-workspace-hero" aria-label="PrivacyGuard AI Overview">
-        <div className="pg-hero-content">
-          <div className="pg-hero-badge">
-            <ShieldCheck size={14} />
-            <span>Active Enterprise Guardrails</span>
-            <span className="pg-hero-badge-tag">
-              {totalScans > 0 ? `${totalScans} Scan${totalScans > 1 ? 's' : ''} in Session` : 'Session Initialized'}
-            </span>
-          </div>
-          <h1 className="pg-hero-title">
-            Enterprise Privacy &amp; Data Minimization
-          </h1>
-          <p className="pg-hero-description">
-            Safeguard sensitive customer records, developer tokens, and regulated PII before
-            inbound payloads reach external LLMs or third-party inference APIs.
+      {/* Welcome Hero Area (Matching Reference Panel 4) */}
+      <section className="pg-workspace-hero-panel" aria-label="Privacy Workspace Welcome">
+        <div className="pg-workspace-hero-body">
+          <span className="pg-workspace-greeting">Welcome Back,</span>
+          <h1 className="pg-workspace-heading">Your Workspace</h1>
+          <p className="pg-workspace-subheading">
+            Scan, protect, and review your documents with privacy in mind.
           </p>
 
-          <div className="pg-hero-actions">
+          <div className="pg-hero-actions-row">
             <Button
               variant="primary"
               size="md"
@@ -94,9 +86,8 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
               onClick={() => handleGo('scanner')}
               id="dashboard-start-scan-btn"
             >
-              Start a Privacy Scan
+              New Privacy Scan
             </Button>
-
             <Button
               variant="secondary"
               size="md"
@@ -104,52 +95,102 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
               onClick={() => handleGo('history')}
               id="dashboard-view-history-btn"
             >
-              View Audit History ({totalScans})
+              Audit History ({totalScans})
             </Button>
-
-            {totalScans > 0 && (
-              <Button
-                variant="outline"
-                size="md"
-                icon={Eye}
-                onClick={() => handleInspectScan(scanHistory[0])}
-                id="dashboard-view-results-btn"
-              >
-                Inspect Latest Scan
-              </Button>
-            )}
           </div>
         </div>
 
-        {/* Live Architecture Status Note */}
-        <div className="pg-workspace-status-callout" role="note">
-          <div className="pg-status-callout-header">
-            <Sparkles size={14} className="pg-text-cream" />
-            <strong>Real-time Telemetry Gateway</strong>
-          </div>
-          <p>
-            {isCloud
-              ? 'Metrics and audit records below reflect authenticated telemetry synchronized with your Supabase PostgreSQL database under Row Level Security.'
-              : 'Metrics and audit records below reflect actual prompt scans processed during this active session. Cloud persistence synchronizes when logged in via Supabase.'}
-          </p>
+        <div className="pg-workspace-hero-graphic">
+          <img
+            src={dashboardTechImg}
+            alt="Monochrome security workstation with protected documents"
+            className="pg-workspace-laptop-img"
+          />
         </div>
       </section>
 
-      {/* Summary Stat Cards populated from actual scan data */}
+      {/* 4 Workspace Action Cards (Matching Reference Panel 4) */}
+      <section className="pg-workspace-action-cards-grid" aria-label="Workspace Actions">
+        <div
+          className="pg-action-card"
+          onClick={() => handleGo('scanner')}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="pg-action-card-icon">
+            <Scan size={20} />
+          </div>
+          <div className="pg-action-card-text">
+            <h3 className="pg-action-card-title">New Scan</h3>
+            <p className="pg-action-card-desc">Scan a document or paste text</p>
+          </div>
+          <ChevronRight size={16} className="pg-action-card-arrow" />
+        </div>
+
+        <div
+          className="pg-action-card"
+          onClick={() => handleGo('history')}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="pg-action-card-icon">
+            <History size={20} />
+          </div>
+          <div className="pg-action-card-text">
+            <h3 className="pg-action-card-title">Scan History</h3>
+            <p className="pg-action-card-desc">View your scan history</p>
+          </div>
+          <ChevronRight size={16} className="pg-action-card-arrow" />
+        </div>
+
+        <div
+          className="pg-action-card"
+          onClick={() => handleGo('analytics')}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="pg-action-card-icon">
+            <BarChart3 size={20} />
+          </div>
+          <div className="pg-action-card-text">
+            <h3 className="pg-action-card-title">Analytics</h3>
+            <p className="pg-action-card-desc">Track your usage and insights</p>
+          </div>
+          <ChevronRight size={16} className="pg-action-card-arrow" />
+        </div>
+
+        <div
+          className="pg-action-card"
+          onClick={() => handleGo('settings')}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="pg-action-card-icon">
+            <Settings size={20} />
+          </div>
+          <div className="pg-action-card-text">
+            <h3 className="pg-action-card-title">Settings</h3>
+            <p className="pg-action-card-desc">Manage your preferences</p>
+          </div>
+          <ChevronRight size={16} className="pg-action-card-arrow" />
+        </div>
+      </section>
+
+      {/* Real Statistics Section */}
       <section className="pg-workspace-section" aria-label="Key Performance Indicators">
         <div className="pg-section-header">
           <div>
-            <h2 className="pg-section-title">Security &amp; Privacy Telemetry</h2>
+            <h2 className="pg-section-title">Telemetry &amp; Findings</h2>
             <p className="pg-section-subtitle">
-              Cumulative metrics derived strictly from actual session scans
+              Cumulative metrics derived strictly from actual authenticated scans
             </p>
           </div>
           <span className="pg-badge-status-pill">
             {totalScans === 0
               ? 'Awaiting First Scan'
               : isCloud
-              ? 'Supabase Cloud Telemetry'
-              : 'Live Session Telemetry'}
+              ? 'Supabase RLS Active'
+              : 'Session Initialized'}
           </span>
         </div>
 
@@ -195,171 +236,37 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
         </div>
       </section>
 
-      {/* Three-Step Workflow Section */}
-      <section className="pg-workspace-section" aria-label="PrivacyGuard Processing Pipeline">
+      {/* Activity and Recent Scans Section */}
+      <section className="pg-workspace-section" aria-label="Recent Activity">
         <div className="pg-section-header">
           <div>
-            <h2 className="pg-section-title">The Three-Step Guardrail Workflow</h2>
+            <h2 className="pg-section-title">Recent Activity</h2>
             <p className="pg-section-subtitle">
-              How PrivacyGuard AI intercepts and sanitizes payloads in under 20 milliseconds
+              Verified executions and protected document logs
             </p>
           </div>
-          <button
-            type="button"
-            className="pg-editorial-link-btn"
-            onClick={() => handleGo('scanner')}
-          >
-            <span>Try the Pipeline</span>
-            <ChevronRight size={14} />
-          </button>
-        </div>
-
-        <div className="pg-workflow-grid">
-          {/* Step 1: Detect */}
-          <div className="pg-workflow-card">
-            <div className="pg-workflow-step-num">Step 01</div>
-            <div className="pg-workflow-icon-wrap">
-              <Search size={22} strokeWidth={1.8} />
-            </div>
-            <h3 className="pg-workflow-title">1. Detect</h3>
-            <p className="pg-workflow-text">
-              High-speed regex and NLP models scan prompts, API payloads, and documents for
-              over 40+ PII categories, including emails, credit cards, SSNs, and developer secrets.
-            </p>
-            <div className="pg-workflow-tags">
-              <span className="pg-tag">PII Scanning</span>
-              <span className="pg-tag">Developer Keys</span>
-              <span className="pg-tag">Regex + NLP</span>
-            </div>
-          </div>
-
-          {/* Step 2: Minimize */}
-          <div className="pg-workflow-card">
-            <div className="pg-workflow-step-num">Step 02</div>
-            <div className="pg-workflow-icon-wrap">
-              <Lock size={22} strokeWidth={1.8} />
-            </div>
-            <h3 className="pg-workflow-title">2. Minimize</h3>
-            <p className="pg-workflow-text">
-              Dynamically substitutes confidential tokens with realistic synthetic entities or
-              deterministic masks. Context, grammar, and semantic coherence remain fully intact for the model.
-            </p>
-            <div className="pg-workflow-tags">
-              <span className="pg-tag">Synthetic Faker</span>
-              <span className="pg-tag">Tokenized Mask</span>
-              <span className="pg-tag">Full Redaction</span>
-            </div>
-          </div>
-
-          {/* Step 3: Audit */}
-          <div className="pg-workflow-card">
-            <div className="pg-workflow-step-num">Step 03</div>
-            <div className="pg-workflow-icon-wrap">
-              <CheckCircle2 size={22} strokeWidth={1.8} />
-            </div>
-            <h3 className="pg-workflow-title">3. Audit &amp; Verify</h3>
-            <p className="pg-workflow-text">
-              Every intercepted request produces a verifiable audit record. Review side-by-side diffs,
-              track confidence ratings, and export compliance reports for GDPR and HIPAA audits.
-            </p>
-            <div className="pg-workflow-tags">
-              <span className="pg-tag">Zero Retention</span>
-              <span className="pg-tag">JSON Audit Export</span>
-              <span className="pg-tag">GDPR &amp; HIPAA</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Quick Launchpad Strip */}
-      <section className="pg-workspace-section" aria-label="Quick Actions">
-        <div className="pg-section-header">
-          <h2 className="pg-section-title">Quick Actions</h2>
-        </div>
-
-        <div className="pg-quick-actions-grid">
-          <button
-            type="button"
-            className="pg-quick-action-card"
-            onClick={() => handleGo('scanner')}
-          >
-            <div className="pg-qa-icon">
-              <Scan size={18} />
-            </div>
-            <div className="pg-qa-content">
-              <span className="pg-qa-label">Launch Scanner Studio</span>
-              <span className="pg-qa-desc">Analyze a raw prompt or upload a text document</span>
-            </div>
-            <ChevronRight size={16} className="pg-qa-arrow" />
-          </button>
-
-          <button
-            type="button"
-            className="pg-quick-action-card"
-            onClick={() => handleGo('history')}
-          >
-            <div className="pg-qa-icon">
-              <History size={18} />
-            </div>
-            <div className="pg-qa-content">
-              <span className="pg-qa-label">Inspect Audit Logs</span>
-              <span className="pg-qa-desc">Review records and export CSV summaries</span>
-            </div>
-            <ChevronRight size={16} className="pg-qa-arrow" />
-          </button>
-
-          <button
-            type="button"
-            className="pg-quick-action-card"
-            onClick={() => handleGo('settings')}
-          >
-            <div className="pg-qa-icon">
-              <Sliders size={18} />
-            </div>
-            <div className="pg-qa-content">
-              <span className="pg-qa-label">Configure Policies</span>
-              <span className="pg-qa-desc">Customize default masking and strictness</span>
-            </div>
-            <ChevronRight size={16} className="pg-qa-arrow" />
-          </button>
-        </div>
-      </section>
-
-      {/* Recent Scan Activity Feed */}
-      <section className="pg-workspace-section" aria-label="Recent Scan Activity">
-        <div className="pg-section-header">
-          <div>
-            <h2 className="pg-section-title">Recent Scan Activity</h2>
-            <p className="pg-section-subtitle">
-              {totalScans > 0
-                ? `Displaying ${recentScans.length} active session scan record${recentScans.length > 1 ? 's' : ''}`
-                : 'Session audit records'}
-            </p>
-          </div>
-          <div className="pg-header-action-group">
-            {totalScans > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                iconAfter={ArrowRight}
-                onClick={() => handleGo('history')}
-                id="view-all-history-btn"
-              >
-                View All History ({totalScans})
-              </Button>
-            )}
-          </div>
+          {totalScans > 0 && (
+            <button
+              type="button"
+              className="pg-editorial-link-btn"
+              onClick={() => handleGo('history')}
+            >
+              <span>View Full History ({totalScans})</span>
+              <ChevronRight size={14} />
+            </button>
+          )}
         </div>
 
         {totalScans === 0 ? (
-          <div className="pg-empty-state-card">
+          /* Well-designed empty state */
+          <div className="pg-empty-state-card" role="region" aria-label="No Recent Scans">
             <div className="pg-empty-icon-wrap">
-              <Activity size={32} className="pg-text-cream-subtle" />
+              <Scan size={36} className="pg-text-cream-subtle" />
             </div>
-            <h3 className="pg-empty-title">No Scan Activity Recorded in Current Session</h3>
+            <h3 className="pg-empty-title">No Scan Activity Recorded Yet</h3>
             <p className="pg-empty-desc">
-              Execute your first prompt analysis in the Privacy Scanner to record real risk exposure,
-              entity distributions, and audit records.
+              Your recent scans and telemetry logs will display here as you audit documents.
+              Paste a prompt or upload a text document in the Privacy Scanner to begin.
             </p>
             <div className="pg-empty-actions">
               <Button
@@ -368,89 +275,76 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
                 icon={Scan}
                 onClick={() => handleGo('scanner')}
               >
-                Launch Privacy Scanner
+                Start a Privacy Scan
               </Button>
             </div>
           </div>
         ) : (
-          <div className="pg-table-card">
+          <div className="pg-card pg-p-0">
             <div className="pg-table-responsive">
-              <table className="pg-table" aria-label="Recent Scans List">
+              <table className="pg-table">
                 <thead>
                   <tr>
-                    <th scope="col">Scan ID &amp; Task</th>
-                    <th scope="col">Timestamp</th>
-                    <th scope="col">Minimization Mode</th>
-                    <th scope="col">Findings</th>
-                    <th scope="col">Status</th>
-                    <th scope="col" className="pg-text-right">Action</th>
+                    <th>Task &amp; Document</th>
+                    <th>Entities Detected</th>
+                    <th>Status</th>
+                    <th>Timestamp</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentScans.map((scan) => {
-                    const findingsCount = scan.findings?.length ?? scan.counts?.total ?? 0;
-                    return (
-                      <tr key={scan.scanId} className="pg-table-row">
-                        <td>
-                          <div className="pg-scan-primary-cell">
-                            <span className="pg-scan-id">{scan.scanId}</span>
-                            <span className="pg-scan-name">{scan.taskName}</span>
+                  {recentScans.map((scan, idx) => (
+                    <tr key={scan.scanId || `recent-${idx}`}>
+                      <td>
+                        <div className="pg-table-task-cell">
+                          <FileText size={16} className="pg-table-icon" />
+                          <div>
+                            <span className="pg-task-name">{scan.taskName || 'Prompt Privacy Audit'}</span>
+                            <span className="pg-task-id">{scan.scanId || 'SCN-LOCAL'}</span>
                           </div>
-                        </td>
-                        <td className="pg-table-muted">
-                          {new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                        <td>
-                          <span className="pg-mode-badge">{scan.mode}</span>
-                        </td>
-                        <td>
-                          <div className="pg-findings-cell">
-                            <span className="pg-findings-count">{findingsCount} found</span>
-                            <span className="pg-findings-types">
-                              {scan.categories?.slice(0, 2).join(', ') || (findingsCount === 0 ? 'Clean' : 'Protected')}
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <span
-                            className={`pg-status-pill ${
-                              findingsCount === 0 ? 'pg-status-clean' : 'pg-status-protected'
-                            }`}
-                          >
-                            {findingsCount === 0 ? 'Clean' : 'Protected'}
-                          </span>
-                        </td>
-                        <td className="pg-text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            icon={Eye}
-                            onClick={() => handleInspectScan(scan)}
-                            aria-label={`Inspect ${scan.taskName} results`}
-                          >
-                            Inspect
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="pg-mono-val">
+                          {scan.findings?.length ?? scan.counts?.total ?? 0} sensitive items
+                        </span>
+                      </td>
+                      <td>
+                        <span className="pg-badge-status-pill">Protected</span>
+                      </td>
+                      <td>
+                        <span className="pg-time-val">{scan.timestamp || 'Just now'}</span>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="pg-btn-inspect-sm"
+                          onClick={() => handleInspectScan(scan)}
+                        >
+                          <Eye size={13} />
+                          <span>Inspect</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-            <div className="pg-table-footer">
-              <span className="pg-table-footer-text">
-                Session Audit Log: {totalScans} verified scan event{totalScans > 1 ? 's' : ''}.
-              </span>
-              <button
-                type="button"
-                className="pg-editorial-link-btn"
-                onClick={() => handleGo('scanner')}
-              >
-                Scan new payload
-              </button>
-            </div>
           </div>
         )}
+      </section>
+
+      {/* Architecture Transparency Note */}
+      <section className="pg-workspace-status-callout" role="note">
+        <div className="pg-status-callout-header">
+          <Sparkles size={14} className="pg-text-cream" />
+          <strong>Local Neural Inference &amp; Zero-Log Storage</strong>
+        </div>
+        <p>
+          PrivacyGuard AI processes prompts entirely in-memory using local GLiNER and Microsoft Presidio models.
+          Raw source text and detected entity values are never written to disk, sent to external cloud APIs,
+          or persisted in database records.
+        </p>
       </section>
     </div>
   );

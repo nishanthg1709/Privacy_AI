@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle, CheckCircle2, User, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import Button from './Button';
 
@@ -147,57 +147,64 @@ export default function SignupForm() {
           <label htmlFor="signup-name" className="pg-auth-label">
             Full Name
           </label>
-          <input
-            id="signup-name"
-            type="text"
-            className="pg-auth-input"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setError('');
-            }}
-            placeholder="e.g. Sarah Connor"
-            autoComplete="name"
-            required
-          />
+          <div className="pg-auth-input-with-icon-wrap">
+            <User size={16} className="pg-input-leading-icon" />
+            <input
+              id="signup-name"
+              type="text"
+              className="pg-auth-input pg-input-with-leading-icon"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError('');
+              }}
+              placeholder="John Doe"
+              autoComplete="name"
+              required
+            />
+          </div>
         </div>
 
         {/* Work Email */}
         <div className="pg-auth-field">
           <label htmlFor="signup-email" className="pg-auth-label">
-            Corporate / Work Email
+            Email
           </label>
-          <input
-            id="signup-email"
-            type="email"
-            className="pg-auth-input"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setError('');
-            }}
-            placeholder="name@company.com"
-            autoComplete="email"
-            required
-          />
+          <div className="pg-auth-input-with-icon-wrap">
+            <Mail size={16} className="pg-input-leading-icon" />
+            <input
+              id="signup-email"
+              type="email"
+              className="pg-auth-input pg-input-with-leading-icon"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError('');
+              }}
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+            />
+          </div>
         </div>
 
         {/* Password */}
         <div className="pg-auth-field">
           <label htmlFor="signup-password" className="pg-auth-label">
-            Password (min. 8 characters)
+            Password
           </label>
-          <div className="pg-auth-password-wrap">
+          <div className="pg-auth-input-with-icon-wrap">
+            <Lock size={16} className="pg-input-leading-icon" />
             <input
               id="signup-password"
               type={showPassword ? 'text' : 'password'}
-              className="pg-auth-input pg-input-with-icon"
+              className="pg-auth-input pg-input-with-leading-icon"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
                 setError('');
               }}
-              placeholder="••••••••••••"
+              placeholder="Create a password"
               autoComplete="new-password"
               required
             />
@@ -236,19 +243,22 @@ export default function SignupForm() {
           <label htmlFor="signup-confirm-password" className="pg-auth-label">
             Confirm Password
           </label>
-          <input
-            id="signup-confirm-password"
-            type={showPassword ? 'text' : 'password'}
-            className="pg-auth-input"
-            value={confirmPassword}
-            onChange={(e) => {
-              setConfirmPassword(e.target.value);
-              setError('');
-            }}
-            placeholder="••••••••••••"
-            autoComplete="new-password"
-            required
-          />
+          <div className="pg-auth-input-with-icon-wrap">
+            <Lock size={16} className="pg-input-leading-icon" />
+            <input
+              id="signup-confirm-password"
+              type={showPassword ? 'text' : 'password'}
+              className="pg-auth-input pg-input-with-leading-icon"
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                setError('');
+              }}
+              placeholder="Confirm your password"
+              autoComplete="new-password"
+              required
+            />
+          </div>
         </div>
 
         {/* Terms & Conditions Checkbox */}
@@ -261,7 +271,7 @@ export default function SignupForm() {
               onChange={(e) => setAgreeTerms(e.target.checked)}
             />
             <span>
-              I accept the{' '}
+              I agree to the{' '}
               <button
                 type="button"
                 className="pg-terms-modal-trigger"
@@ -270,7 +280,7 @@ export default function SignupForm() {
                   setTermsModalOpen(true);
                 }}
               >
-                Terms of Service &amp; Privacy Policy
+                Terms &amp; Conditions
               </button>
             </span>
           </label>
@@ -284,9 +294,9 @@ export default function SignupForm() {
           isLoading={isLoading}
           disabled={isLoading || !isCloudConfigured}
           iconAfter={ArrowRight}
-          className="pg-w-full"
+          className="pg-w-full pg-auth-submit-btn"
         >
-          Create Workspace Account
+          Create Account
         </Button>
       </form>
 
@@ -294,7 +304,7 @@ export default function SignupForm() {
       <div className="pg-auth-switch-prompt">
         <span>Already have an account?</span>{' '}
         <Link to="/login" className="pg-auth-switch-link">
-          Sign in
+          Log In
         </Link>
       </div>
 

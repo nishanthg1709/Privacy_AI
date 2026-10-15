@@ -6,16 +6,34 @@ import {
   RotateCcw,
   CheckCircle2,
   Download,
-  Info
+  Info,
+  User,
+  Lock
 } from 'lucide-react';
 import Button from '../components/Button';
+import { useAuth } from '../context/useAuth';
 
 /**
  * Editorial Settings Page Component
- * Allows user to configure privacy guardrail defaults and interface preferences.
+ * Allows user to configure privacy guardrail defaults, interface preferences,
+ * and view/update their personal profile in public.profiles.
  * All toggles and buttons are functional and persist state.
  */
 export default function Settings({ settings, onSaveSettings }) {
+  const { user, updateProfile, isCloudConfigured } = useAuth();
+
+  // Local user profile state
+  const currentUserName = user?.displayName || user?.name || '';
+  const [profileName, setProfileName] = useState(currentUserName);
+  const [prevUserName, setPrevUserName] = useState(currentUserName);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState(null);
+
+  if (currentUserName && currentUserName !== prevUserName) {
+    setPrevUserName(currentUserName);
+    setProfileName(currentUserName);
+  }
+
   // Local editable form state
   const [formData, setFormData] = useState({
     defaultMode: settings?.defaultMode || 'synthetic',
@@ -41,6 +59,29 @@ export default function Settings({ settings, onSaveSettings }) {
     compactMode: false,
     showConfidenceBadges: true,
     soundAlerts: false,
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    if (!profileName.trim()) {
+      setProfileMessage({ type: 'error', text: 'Display name cannot be empty.' });
+      return;
+    }
+    setIsUpdatingProfile(true);
+    setProfileMessage(null);
+    try {
+      if (updateProfile) {
+        await updateProfile({ displayName: profileName.trim() });
+        setProfileMessage({ type: 'success', text: 'Profile display name updated successfully in public.profiles.' });
+      } else {
+        setProfileMessage({ type: 'success', text: 'Profile display name saved locally.' });
+      }
+    } catch (err) {
+      setProfileMessage({ type: 'error', text: err.message || 'Failed to update profile.' });
+    } finally {
+      setIsUpdatingProfile(false);
+      setTimeout(() => setProfileMessage(null), 4000);
+    }
   };
 
   const handleToggle = (field) => {
@@ -135,6 +176,109 @@ export default function Settings({ settings, onSaveSettings }) {
       )}
 
       <form onSubmit={handleSubmit} className="pg-settings-layout">
+        {/* Section 0: Authenticated User Profile (Supabase public.profiles) */}
+        <div className="pg-card" role="region" aria-label="User Profile">
+          <div className="pg-card-header-with-icon">
+            <div className="pg-card-icon-badge">
+              <User size={18} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 className="pg-card-title">User Profile</h2>
+                <span className="pg-badge-status-pill">
+                  {isCloudConfigured ? 'Supabase RLS Active' : 'Local Session'}
+                </span>
+              </div>
+              <p className="pg-card-subtitle">
+                Account identity synchronized with Supabase public.profiles
+              </p>
+            </div>
+          </div>
+
+          {profileMessage && (
+            <div
+              className={`pg-banner ${profileMessage.type === 'success' ? 'pg-banner-success' : 'pg-banner-error'}`}
+              style={{ marginBottom: '16px' }}
+              role="status"
+            >
+              <div className="pg-banner-icon">
+                {profileMessage.type === 'success' ? <CheckCircle2 size={16} /> : <Info size={16} />}
+              </div>
+              <div className="pg-banner-content">
+                <span>{profileMessage.text}</span>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+            <div className="pg-form-group" style={{ marginBottom: 0 }}>
+              <label className="pg-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Lock size={13} />
+                User ID (UUID)
+              </label>
+              <input
+                type="text"
+                className="pg-input"
+                value={user?.id || 'Unauthenticated'}
+                readOnly
+                disabled
+                style={{ opacity: 0.7, cursor: 'not-allowed', fontFamily: 'var(--pg-font-mono, monospace)', fontSize: '0.8rem' }}
+                aria-label="Immutable user ID"
+              />
+              <span className="pg-field-hint">
+                Primary key referencing auth.users(id). Immutably protected by RLS.
+              </span>
+            </div>
+
+            <div className="pg-form-group" style={{ marginBottom: 0 }}>
+              <label className="pg-label">Email Address</label>
+              <input
+                type="text"
+                className="pg-input"
+                value={user?.email || 'N/A'}
+                readOnly
+                disabled
+                style={{ opacity: 0.7, cursor: 'not-allowed' }}
+                aria-label="User email"
+              />
+              <span className="pg-field-hint">
+                Authentication identity managed via Supabase Auth.
+              </span>
+            </div>
+          </div>
+
+          <div className="pg-form-group">
+            <label htmlFor="settings-display-name" className="pg-label">
+              Display Name
+            </label>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input
+                id="settings-display-name"
+                type="text"
+                className="pg-input"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                placeholder="Enter your full or preferred name"
+                disabled={isUpdatingProfile}
+                style={{ flex: 1 }}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={handleUpdateProfile}
+                disabled={isUpdatingProfile || !user}
+                id="settings-update-profile-btn"
+              >
+                {isUpdatingProfile ? 'Saving...' : 'Update Name'}
+              </Button>
+            </div>
+            <span className="pg-field-hint">
+              Updates public.profiles.display_name directly in Supabase with RLS verification.
+            </span>
+          </div>
+        </div>
+
         {/* Section 1: Privacy & Minimization Defaults */}
         <div className="pg-card">
           <div className="pg-card-header-with-icon">
@@ -319,7 +463,7 @@ export default function Settings({ settings, onSaveSettings }) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.84rem', color: 'var(--pg-cream-200)', lineHeight: '1.6' }}>
             <div style={{ background: 'var(--pg-bg-elevated)', padding: '14px 16px', borderRadius: 'var(--pg-radius-xs)', border: '1px solid var(--pg-border-hairline)' }}>
-              <strong style={{ color: '#86efac', display: 'block', marginBottom: '4px' }}>
+              <strong style={{ color: 'var(--pg-cream)', display: 'block', marginBottom: '4px' }}>
                 1. Local AI Execution (FastAPI + GLiNER + Presidio)
               </strong>
               <span>
@@ -328,7 +472,7 @@ export default function Settings({ settings, onSaveSettings }) {
             </div>
 
             <div style={{ background: 'var(--pg-bg-elevated)', padding: '14px 16px', borderRadius: 'var(--pg-radius-xs)', border: '1px solid var(--pg-border-hairline)' }}>
-              <strong style={{ color: '#7dd3fc', display: 'block', marginBottom: '4px' }}>
+              <strong style={{ color: 'var(--pg-cream)', display: 'block', marginBottom: '4px' }}>
                 2. Supabase Cloud Telemetry &amp; Auth (Row Level Security)
               </strong>
               <span>
@@ -337,7 +481,7 @@ export default function Settings({ settings, onSaveSettings }) {
             </div>
 
             <div style={{ background: 'var(--pg-bg-elevated)', padding: '14px 16px', borderRadius: 'var(--pg-radius-xs)', border: '1px solid var(--pg-border-hairline)' }}>
-              <strong style={{ color: '#fde047', display: 'block', marginBottom: '4px' }}>
+              <strong style={{ color: 'var(--pg-cream)', display: 'block', marginBottom: '4px' }}>
                 3. Strict Zero-Log Policy
               </strong>
               <span>

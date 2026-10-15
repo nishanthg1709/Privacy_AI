@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Shield, ArrowRight, Menu, X, LayoutDashboard } from 'lucide-react';
+import { ArrowRight, Menu, X, LayoutDashboard } from 'lucide-react';
+import ShieldKeyholeIcon from './ShieldKeyholeIcon';
 import { useAuth } from '../context/useAuth';
 import Button from './Button';
 
@@ -24,10 +25,11 @@ export default function Navbar() {
   }, []);
 
   const navLinks = [
-    { label: 'Philosophy', href: '#about' },
-    { label: 'Guardrails', href: '#features' },
-    { label: 'Workflow', href: '#workflow' },
+    { label: 'Home', href: '#hero' },
+    { label: 'About', href: '#about' },
+    { label: 'Features', href: '#features' },
     { label: 'How It Works', href: '#how-it-works' },
+    { label: 'Contact', href: '#contact' },
   ];
 
   const handleScrollTo = (e, id) => {
@@ -46,10 +48,10 @@ export default function Navbar() {
         aria-label="Main Navigation"
       >
         <div className="pg-nav-inner">
-          {/* Brand Mark */}
+          {/* Brand Mark with Refined Shield-and-Keyhole */}
           <Link to="/" className="pg-brand-link">
             <div className="pg-brand-symbol">
-              <Shield size={18} strokeWidth={2.2} />
+              <ShieldKeyholeIcon size={18} />
             </div>
             <div className="pg-brand-title-wrap">
               <span className="pg-brand-title">PrivacyGuard</span>
@@ -57,7 +59,7 @@ export default function Navbar() {
             </div>
           </Link>
 
-          {/* Desktop Nav Links */}
+          {/* Desktop Nav Links matching Reference Panel 1 */}
           <nav className="pg-nav-desktop-links" aria-label="Sections">
             {navLinks.map((link) => (
               <a
@@ -71,7 +73,7 @@ export default function Navbar() {
             ))}
           </nav>
 
-          {/* Auth Actions */}
+          {/* Auth Actions matching Reference Panel 1 */}
           <div className="pg-nav-desktop-actions">
             {isAuthenticated ? (
               <Button
@@ -85,7 +87,7 @@ export default function Navbar() {
             ) : (
               <>
                 <Link to="/login" className="pg-nav-login-link">
-                  Log in
+                  Sign In
                 </Link>
                 <Button
                   variant="primary"

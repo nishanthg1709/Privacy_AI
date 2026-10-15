@@ -4,58 +4,74 @@
    ========================================================================== */
 
 :root {
-  /* Color Palette - Near-Black Canvas */
-  --pg-bg-root: #08080a;
-  --pg-bg-surface: #0e0e12;
-  --pg-bg-elevated: #131318;
-  --pg-bg-card: #121217;
-  --pg-bg-card-hover: #17171f;
-  --pg-bg-input: #0a0a0e;
-  --pg-bg-code: #0b0b10;
+  /* Color Palette - Sophisticated Monochrome Foundation (#050505, #0A0A0A, #111111, #171717) */
+  --pg-bg-main: #050505;
+  --pg-bg-root: #050505;
+  --pg-bg-secondary: #0A0A0A;
+  --pg-bg-surface: #0A0A0A;
+  --pg-bg-card: #111111;
+  --pg-bg-elevated: #171717;
+  --pg-hover-surface: #222222;
+  --pg-bg-card-hover: #222222;
+  --pg-bg-input: #080808;
+  --pg-bg-code: #0c0c0c;
 
-  /* Typography Palette - Warm Cream & Off-White */
-  --pg-cream-pure: #ffffff;
-  --pg-cream-100: #faf7f2; /* Primary headline & high-contrast text */
-  --pg-cream-200: #eae5dc; /* Body text */
-  --pg-cream-300: #b5b0a6; /* Secondary descriptions */
-  --pg-cream-400: #78746c; /* Captions & metadata */
-  --pg-cream-500: #42403b; /* Subtle dividers */
+  /* Typography Palette - Editorial Contrast (#F5F3EE, #B5B5B5, #858585) */
+  --pg-text-primary: #F5F3EE;
+  --pg-text-secondary: #B5B5B5;
+  --pg-text-muted: #858585;
+  --pg-cream-pure: #FFFFFF;
+  --pg-cream-100: #F5F3EE;
+  --pg-cream-200: #E6E4DE;
+  --pg-cream-300: #B5B5B5;
+  --pg-cream-400: #858585;
+  --pg-cream-500: #303030;
 
-  /* Minimal Hairline Borders */
-  --pg-border-hairline: rgba(250, 247, 242, 0.08);
-  --pg-border-subtle: rgba(250, 247, 242, 0.14);
-  --pg-border-highlight: rgba(250, 247, 242, 0.28);
-  --pg-border-focus: #faf7f2;
+  /* Borders - Precise Monochrome Hairlines (#303030) */
+  --pg-border-hairline: #303030;
+  --pg-border-subtle: #303030;
+  --pg-border-highlight: rgba(245, 243, 238, 0.28);
+  --pg-border-focus: #F5F3EE;
 
-  /* Restrained Functional Status Accents */
-  --pg-champagne: #e4d8c0;
-  --pg-mint-soft: #4ade80;
-  --pg-amber-soft: #fbbf24;
-  --pg-danger-soft: #f87171;
+  /* Buttons */
+  --pg-btn-bg: #F5F3EE;
+  --pg-btn-text: #080808;
+
+  /* Strict Zero-Color Monochrome Functional Accents */
+  --pg-accent-white: #F5F3EE;
+  --pg-accent-silver: #D1D1D1;
+  --pg-accent-grey: #858585;
+  --pg-accent-darkgrey: #303030;
+  --pg-mint-soft: #F5F3EE;
+  --pg-amber-soft: #D1D1D1;
+  --pg-danger-soft: #B5B5B5;
+  --pg-champagne: #F5F3EE;
 
   /* Typography Stacks */
-  --pg-font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --pg-font-display: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   --pg-font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   --pg-font-mono: 'JetBrains Mono', Consolas, monospace;
 
-  /* Radii - Refined, architectural, understated */
-  --pg-radius-xs: 3px;
-  --pg-radius-sm: 6px;
-  --pg-radius-md: 10px;
-  --pg-radius-lg: 14px;
+  /* Radii */
+  --pg-radius-xs: 4px;
+  --pg-radius-sm: 8px;
+  --pg-radius-md: 12px;
+  --pg-radius-lg: 16px;
   --pg-radius-pill: 9999px;
 
   /* Dimensions */
-  --pg-sidebar-width: 280px;
+  --pg-sidebar-width: 260px;
   --pg-topbar-height: 64px;
 
-  /* Transitions */
+  /* Animations & Transitions */
   --pg-transition-snappy: 160ms cubic-bezier(0.16, 1, 0.3, 1);
   --pg-transition-smooth: 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  --pg-transition-slow: 600ms cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Shadows - Deep, rich, non-saturated */
-  --pg-shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.5);
-  --pg-shadow-floating: 0 16px 48px rgba(0, 0, 0, 0.75);
+  /* Shadows - Deep, rich monochrome glow */
+  --pg-shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.6);
+  --pg-shadow-floating: 0 16px 48px rgba(0, 0, 0, 0.85);
+  --pg-shadow-glow: 0 0 24px rgba(245, 243, 238, 0.08);
 }
 
 /* Base Resets */

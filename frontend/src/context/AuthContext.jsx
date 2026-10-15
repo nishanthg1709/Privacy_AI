@@ -91,6 +91,45 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updateProfile = async ({ displayName }) => {
+    if (!user?.id) throw new Error('No authenticated user session.');
+    setIsLoading(true);
+    try {
+      const updated = await authService.updateProfile(user.id, { displayName });
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: updated.display_name,
+              displayName: updated.display_name,
+              updatedAt: updated.updated_at,
+            }
+          : prev
+      );
+      return updated;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (!user?.id) return null;
+    const profile = await authService.getProfile(user.id);
+    if (profile) {
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: profile.display_name || prev.name,
+              displayName: profile.display_name || prev.displayName,
+              updatedAt: profile.updated_at || prev.updatedAt,
+            }
+          : prev
+      );
+    }
+    return profile;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -101,6 +140,8 @@ export function AuthProvider({ children }) {
         login,
         signup,
         logout,
+        updateProfile,
+        refreshProfile,
       }}
     >
       {children}

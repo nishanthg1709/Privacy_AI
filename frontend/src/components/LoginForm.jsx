@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle, CheckCircle2, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import Button from './Button';
 
@@ -99,27 +99,30 @@ export default function LoginForm() {
       )}
 
       <form onSubmit={handleSubmit} className="pg-auth-form" noValidate>
-        {/* Email Field */}
+        {/* Email Field with Mail Icon */}
         <div className="pg-auth-field">
           <label htmlFor="login-email" className="pg-auth-label">
-            Work Email Address
+            Email
           </label>
-          <input
-            id="login-email"
-            type="email"
-            className="pg-auth-input"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setError('');
-            }}
-            placeholder="name@company.com"
-            autoComplete="email"
-            required
-          />
+          <div className="pg-auth-input-with-icon-wrap">
+            <Mail size={16} className="pg-input-leading-icon" />
+            <input
+              id="login-email"
+              type="email"
+              className="pg-auth-input pg-input-with-leading-icon"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError('');
+              }}
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+            />
+          </div>
         </div>
 
-        {/* Password Field with Show/Hide */}
+        {/* Password Field with Lock Icon and Eye Toggle */}
         <div className="pg-auth-field">
           <div className="pg-auth-label-row">
             <label htmlFor="login-password" className="pg-auth-label">
@@ -134,17 +137,18 @@ export default function LoginForm() {
             </button>
           </div>
 
-          <div className="pg-auth-password-wrap">
+          <div className="pg-auth-input-with-icon-wrap">
+            <Lock size={16} className="pg-input-leading-icon" />
             <input
               id="login-password"
               type={showPassword ? 'text' : 'password'}
-              className="pg-auth-input pg-input-with-icon"
+              className="pg-auth-input pg-input-with-leading-icon"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
                 setError('');
               }}
-              placeholder="••••••••••••"
+              placeholder="Enter your password"
               autoComplete="current-password"
               required
             />
@@ -168,11 +172,11 @@ export default function LoginForm() {
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
             />
-            <span>Remember this device</span>
+            <span>Remember me</span>
           </label>
         </div>
 
-        {/* Primary Submit Button */}
+        {/* Primary Submit Button matching Reference Panel 2 */}
         <Button
           type="submit"
           variant="primary"
@@ -180,15 +184,15 @@ export default function LoginForm() {
           isLoading={isLoading}
           disabled={isLoading || !isCloudConfigured}
           iconAfter={ArrowRight}
-          className="pg-w-full"
+          className="pg-w-full pg-auth-submit-btn"
         >
-          Sign In to Workspace
+          Log In
         </Button>
       </form>
 
       {/* Switch to Signup */}
       <div className="pg-auth-switch-prompt">
-        <span>Don&rsquo;t have a PrivacyGuard account?</span>{' '}
+        <span>New to PrivacyGuard AI?</span>{' '}
         <Link to="/signup" className="pg-auth-switch-link">
           Create an account
         </Link>
