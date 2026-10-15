@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
@@ -6,16 +6,16 @@ import Button from './Button';
 
 /**
  * Editorial LoginForm Component
- * Handles form validation, password visibility toggling, remember-me persistence,
- * error presentation, and instant demo sign in.
+ * Handles Supabase email/password authentication, loading/error states,
+ * and redirecting authenticated users to the workspace.
  */
 export default function LoginForm() {
-  const { login, demoLogin, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, isCloudConfigured } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState('alex.morgan@privacyguard.ai');
-  const [password, setPassword] = useState('demoPassword123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
@@ -23,6 +23,13 @@ export default function LoginForm() {
 
   // Where to redirect after login (defaults to /app/dashboard)
   const from = location.state?.from?.pathname || '/app/dashboard';
+
+  // If already authenticated, redirect to workspace
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,6 +45,13 @@ export default function LoginForm() {
       return;
     }
 
+    if (!isCloudConfigured) {
+      setError(
+        'Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to frontend/.env.'
+      );
+      return;
+    }
+
     try {
       await login({ email, password, rememberMe });
       navigate(from, { replace: true });
@@ -46,26 +60,22 @@ export default function LoginForm() {
     }
   };
 
-  const handleDemoSignIn = async () => {
-    setError('');
-    try {
-      await demoLogin();
-      navigate(from, { replace: true });
-    } catch {
-      setError('Failed to initiate demo session.');
-    }
-  };
-
   return (
     <div className="pg-login-form-root">
-      {/* Demo Notification Banner */}
-      <div className="pg-auth-demo-banner" role="status">
-        <div className="pg-auth-demo-header">
+      {/* Authentication Mode Status Banner */}
+      <div className="pg-auth-status-banner" role="status">
+        <div className="pg-auth-status-header">
           <Sparkles size={14} className="pg-text-cream" />
-          <span>Local Demo Authentication</span>
+          <span>
+            {isCloudConfigured
+              ? 'Supabase Cloud Authentication Active'
+              : 'Supabase Credentials Required'}
+          </span>
         </div>
-        <p className="pg-auth-demo-desc">
-          Click &ldquo;Demo Instant Sign In&rdquo; below or enter any sample email to access the workspace.
+        <p className="pg-auth-status-desc">
+          {isCloudConfigured
+            ? 'Sign in with your registered Supabase credentials to access your workspace.'
+            : 'Supabase credentials are not detected in frontend/.env. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to enable authentication.'}
         </p>
       </div>
 
@@ -82,7 +92,8 @@ export default function LoginForm() {
         <div className="pg-auth-info-banner" role="status">
           <CheckCircle2 size={16} />
           <span>
-            Demo Mode: Password reset instructions simulated for {email || 'your email'}.
+            Password reset instructions can be triggered through your Supabase project dashboard for{' '}
+            {email || 'your email'}.
           </span>
         </div>
       )}
@@ -157,7 +168,7 @@ export default function LoginForm() {
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
             />
-            <span>Remember this device for 30 days</span>
+            <span>Remember this device</span>
           </label>
         </div>
 
@@ -167,23 +178,11 @@ export default function LoginForm() {
           variant="primary"
           size="lg"
           isLoading={isLoading}
+          disabled={isLoading || !isCloudConfigured}
           iconAfter={ArrowRight}
           className="pg-w-full"
         >
           Sign In to Workspace
-        </Button>
-
-        {/* Instant Demo Sign In Button */}
-        <Button
-          type="button"
-          variant="secondary"
-          size="md"
-          icon={Sparkles}
-          onClick={handleDemoSignIn}
-          disabled={isLoading}
-          className="pg-w-full pg-mt-3"
-        >
-          Demo Instant Sign In (1-Click)
         </Button>
       </form>
 

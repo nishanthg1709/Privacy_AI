@@ -303,6 +303,54 @@ export default function Settings({ settings, onSaveSettings }) {
           </div>
         </div>
 
+        {/* Section 3: Architectural Transparency & Privacy Notice (Task 15) */}
+        <div className="pg-card" role="region" aria-label="Privacy Notice & Transparency">
+          <div className="pg-card-header-with-icon">
+            <div className="pg-card-icon-badge">
+              <Info size={18} />
+            </div>
+            <div>
+              <h2 className="pg-card-title">Architectural Transparency &amp; Privacy Notice</h2>
+              <p className="pg-card-subtitle">
+                Clear disclosures regarding data processing, local vs cloud boundaries, and zero-log guarantees
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.84rem', color: 'var(--pg-cream-200)', lineHeight: '1.6' }}>
+            <div style={{ background: 'var(--pg-bg-elevated)', padding: '14px 16px', borderRadius: 'var(--pg-radius-xs)', border: '1px solid var(--pg-border-hairline)' }}>
+              <strong style={{ color: '#86efac', display: 'block', marginBottom: '4px' }}>
+                1. Local AI Execution (FastAPI + GLiNER + Presidio)
+              </strong>
+              <span>
+                All document content, prompts, and raw text are processed strictly within your local machine (http://localhost:8000). Your documents are never transmitted to external third-party AI APIs or remote LLMs.
+              </span>
+            </div>
+
+            <div style={{ background: 'var(--pg-bg-elevated)', padding: '14px 16px', borderRadius: 'var(--pg-radius-xs)', border: '1px solid var(--pg-border-hairline)' }}>
+              <strong style={{ color: '#7dd3fc', display: 'block', marginBottom: '4px' }}>
+                2. Supabase Cloud Telemetry &amp; Auth (Row Level Security)
+              </strong>
+              <span>
+                Supabase is used strictly for user authentication and minimal audit telemetry (user ID, timestamp, task name, finding counts by category, and privacy scores).
+              </span>
+            </div>
+
+            <div style={{ background: 'var(--pg-bg-elevated)', padding: '14px 16px', borderRadius: 'var(--pg-radius-xs)', border: '1px solid var(--pg-border-hairline)' }}>
+              <strong style={{ color: '#fde047', display: 'block', marginBottom: '4px' }}>
+                3. Strict Zero-Log Policy
+              </strong>
+              <span>
+                <strong>What is NEVER stored:</strong> Original document text, protected output text, detected sensitive entity values or snippets, passwords, API tokens, or model embeddings.
+              </span>
+            </div>
+
+            <p style={{ margin: 0, fontStyle: 'italic', fontSize: '0.78rem', color: 'var(--pg-cream-400)' }}>
+              Notice: Automated contextual PII detection significantly reduces privacy exposure, but no automated system can guarantee 100% mathematical anonymization. Complex contextual linkage and novel entity forms should be verified through human audit.
+            </p>
+          </div>
+        </div>
+
         {/* Action Controls Bar */}
         <div className="pg-settings-actions-card">
           <div className="pg-settings-actions-info">

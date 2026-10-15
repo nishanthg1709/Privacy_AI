@@ -42,7 +42,7 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
   const [privacyMode, setPrivacyMode] = useState('synthetic'); // 'synthetic' | 'tokenized' | 'redaction'
   const [strictnessLevel, setStrictnessLevel] = useState('gdpr-hipaa'); // 'gdpr-hipaa' | 'standard' | 'secrets-only'
   const [content, setContent] = useState(
-    `Hello Support,\nMy name is Sarah Connor (SSN: 482-19-9481). Please update my billing email from sarah.connor@cyberdyne.org to s.connor@personalmail.com. You can call me at +1 (555) 234-5678.\nFor authentication, my card on file ends in 4532 (Exp 08/28).\nAlso here is my temp service token: FAKE_API_KEY_PLACEHOLDER\nThanks!`
+    `Hello Support,\nMy name is Sarah Connor (SSN: 482-19-9481). Please update my billing email from sarah.connor@cyberdyne.org to s.connor@personalmail.com. You can call me at +1 (555) 234-5678.\nFor authentication, my card on file ends in 4532 (Exp 08/28).\nAlso here is my temp service token: sk-live_51M0demo00000000000000000000\nThanks!`
   );
 
   const [isScanning, setIsScanning] = useState(false);
@@ -103,8 +103,8 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
 
   // Quick sample presets for testing
   const samplePresets = {
-    pii: `Hello Support,\nMy name is Sarah Connor (SSN: 482-19-9481). Please update my billing email from sarah.connor@cyberdyne.org to s.connor@personalmail.com. You can call me at +1 (555) 234-5678.\nFor authentication, my card on file ends in 4532 (Exp 08/28).\nAlso here is my temp service token: FAKE_API_KEY_PLACEHOLDER\nThanks!`,
-    apiKeys: `// Application environment configuration template\nconst config = {\n  DATABASE_HOST: process.env.DB_HOST || "localhost",\n  DATABASE_PORT: process.env.DB_PORT || "5432",\n  API_KEY: process.env.APP_API_KEY || "FAKE_API_KEY_PLACEHOLDER",\n  NOTIFICATION_URL: process.env.NOTIFICATION_URL || "https://example.com/notifications"\n};`,
+    pii: `Hello Support,\nMy name is Sarah Connor (SSN: 482-19-9481). Please update my billing email from sarah.connor@cyberdyne.org to s.connor@personalmail.com. You can call me at +1 (555) 234-5678.\nFor authentication, my card on file ends in 4532 (Exp 08/28).\nAlso here is my temp service token: sk-live_51M0demo00000000000000000000\nThanks!`,
+    apiKeys: `// Application environment configuration template\nconst config = {\n  DATABASE_HOST: process.env.DB_HOST || "db.internal.apexdev.io",\n  DATABASE_PORT: process.env.DB_PORT || "5432",\n  AWS_ACCESS_KEY_ID: "AKIAIOSFODNN7EXAMPLE",\n  API_KEY: "sk-live_51M0demo00000000000000000000",\n  NOTIFICATION_URL: "https://api.internal.apexdev.io/v1/alerts"\n};`,
     healthcare: `Patient Clinical Summary:\nPatient: Robert J. Miller, DOB: 04/12/1974. MRN #849103.\nAdmitted to St. Jude Regional Hospital with acute respiratory symptoms.\nPrimary Physician: Dr. Allison Green (Phone: 212-555-0199).\nInsurance ID: BCBS-NY-9021-X99.\nPrescribed 50mg Lisinopril daily. Discharged on 10/12/2026.`,
   };
 
@@ -140,6 +140,22 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
   };
 
   const readFile = (file) => {
+    // Audit limits: Task 14 - safe text-file upload capability
+    const maxSizeBytes = 500 * 1024; // 500 KB limit
+    if (file.size > maxSizeBytes) {
+      setScanError(`File exceeds maximum size limit (500 KB). Uploaded file is ${(file.size / 1024).toFixed(1)} KB. PrivacyGuard AI processes documents strictly in-memory.`);
+      return;
+    }
+
+    const allowedExtensions = ['.txt', '.md', '.json', '.csv', '.log'];
+    const fileNameLower = file.name.toLowerCase();
+    const isAllowed = allowedExtensions.some((ext) => fileNameLower.endsWith(ext));
+
+    if (!isAllowed) {
+      setScanError(`Unsupported file type. PrivacyGuard AI accepts plain-text documents (${allowedExtensions.join(', ')}). Executables and binary documents are rejected.`);
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result;
@@ -148,11 +164,14 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
         setTaskName(`Uploaded: ${file.name}`);
         setScanResultNotice({
           type: 'info',
-          title: 'File Ingested',
-          message: `Loaded ${file.name} (${text.length} characters). Ready for analysis.`,
+          title: 'File Ingested Locally',
+          message: `Loaded ${file.name} (${text.length} characters). Ready for local privacy scanning.`,
         });
         setScanError(null);
       }
+    };
+    reader.onerror = () => {
+      setScanError('Failed to read the selected file. Please verify file permissions or paste the text directly.');
     };
     reader.readAsText(file);
   };
@@ -160,6 +179,11 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
   // Perform Real Backend Scan
   const handleAnalyzeAndProtect = async (e) => {
     if (e) e.preventDefault();
+
+    // Prevent duplicate submissions while a scan is running (Task 2 & Task 16)
+    if (isScanning) {
+      return;
+    }
 
     if (!content.trim()) {
       setScanError('Input Required: Please paste prompt text or load a sample document before analyzing.');
@@ -347,6 +371,50 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
                     </p>
                   </div>
                 </label>
+
+                <label
+                  className={`pg-radio-card ${privacyMode === 'task-aware' ? 'pg-radio-card-active' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="privacyMode"
+                    value="task-aware"
+                    checked={privacyMode === 'task-aware'}
+                    onChange={() => setPrivacyMode('task-aware')}
+                    className="pg-sr-only"
+                  />
+                  <div className="pg-radio-content">
+                    <div className="pg-radio-title">
+                      <CheckCircle2 size={15} className="pg-radio-icon" />
+                      <span>Task-Aware</span>
+                    </div>
+                    <p className="pg-radio-desc">
+                      Applies context-specific minimization rules and flags ambiguous decisions.
+                    </p>
+                  </div>
+                </label>
+
+                <label
+                  className={`pg-radio-card ${privacyMode === 'user-approved' ? 'pg-radio-card-active' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="privacyMode"
+                    value="user-approved"
+                    checked={privacyMode === 'user-approved'}
+                    onChange={() => setPrivacyMode('user-approved')}
+                    className="pg-sr-only"
+                  />
+                  <div className="pg-radio-content">
+                    <div className="pg-radio-title">
+                      <Eye size={15} className="pg-radio-icon" />
+                      <span>User-Approved Review</span>
+                    </div>
+                    <p className="pg-radio-desc">
+                      Flags candidate redactions for interactive human review without altering source text.
+                    </p>
+                  </div>
+                </label>
               </div>
             </div>
 
@@ -372,7 +440,7 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
           <div className="pg-card pg-card-compact">
             <h3 className="pg-card-title-sm">Quick Sample Payloads</h3>
             <p className="pg-text-secondary-sm">
-              Populate the input area with sample data for demonstration:
+              Preload synthetic test documents to evaluate detection policies:
             </p>
             <div className="pg-preset-buttons">
               <button

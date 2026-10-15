@@ -40,10 +40,10 @@ export default function AuthLayout({
           <div className="pg-auth-panel-footer">
             <div className="pg-auth-pill">
               <span className="pg-pulse-dot"></span>
-              <span>Local Demonstration Mode • Milestone 1</span>
+              <span>Zero-Log Authentication Gateway</span>
             </div>
             <p className="pg-auth-notice">
-              Accounts are simulated locally. No credentials are transmitted to any external backend.
+              Protected by Supabase Auth with Row Level Security. Telemetry strictly adheres to zero-log policies.
             </p>
           </div>
         </div>

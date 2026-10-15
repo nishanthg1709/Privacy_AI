@@ -1,15 +1,60 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import authService from '../services/authService';
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { AuthContext } from './authContextDef';
 
 /**
- * Editorial Demo AuthProvider
- * Encapsulates authentication session state, login/signup/demoLogin actions,
- * and ready-to-replace Supabase Auth hooks.
+ * Enterprise AuthProvider
+ * Strictly enforces Supabase Auth sessions verified via supabase.auth.getSession()
+ * and synchronized in real-time via supabase.auth.onAuthStateChange().
+ * Zero mock sessions or demo bypasses.
  */
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => authService.getCurrentUser());
+  const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(
+    () => isSupabaseConfigured() && Boolean(supabase)
+  );
+
+  // Synchronize active Supabase session on startup and state changes
+  useEffect(() => {
+    let mounted = true;
+
+    if (isSupabaseConfigured() && supabase) {
+      authService
+        .getInitialSession()
+        .then((initialUser) => {
+          if (mounted) {
+            setUser(initialUser);
+          }
+        })
+        .finally(() => {
+          if (mounted) {
+            setIsInitializing(false);
+          }
+        });
+
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((event, session) => {
+        if (!mounted) return;
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          if (session?.user) {
+            setUser(authService._mapSupabaseUser(session.user));
+          } else {
+            setUser(null);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+      });
+
+      return () => {
+        mounted = false;
+        subscription?.unsubscribe();
+      };
+    }
+  }, []);
 
   const login = async (credentials) => {
     setIsLoading(true);
@@ -26,27 +71,24 @@ export function AuthProvider({ children }) {
     setIsLoading(true);
     try {
       const newUser = await authService.signup(userData);
-      setUser(newUser);
+      // Only set active session user if email confirmation is not pending
+      if (!newUser.emailConfirmationPending) {
+        setUser(newUser);
+      }
       return newUser;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const demoLogin = async () => {
+  const logout = async () => {
     setIsLoading(true);
     try {
-      const demoUser = await authService.demoLogin();
-      setUser(demoUser);
-      return demoUser;
+      await authService.logout();
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const logout = () => {
-    authService.logout();
-    setUser(null);
   };
 
   return (
@@ -54,10 +96,10 @@ export function AuthProvider({ children }) {
       value={{
         user,
         isAuthenticated: Boolean(user),
-        isLoading,
+        isLoading: isLoading || isInitializing,
+        isCloudConfigured: isSupabaseConfigured(),
         login,
         signup,
-        demoLogin,
         logout,
       }}
     >

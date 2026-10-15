@@ -207,6 +207,89 @@ class TestUnitPrivacyModesAndPlaceholders:
         assert response.findings[0].is_ambiguous is False
 
 
+class TestUnitPrivacyIntelligence:
+    """Tests Task 11 explainable privacy intelligence: risk reasoning, data minimization, uncertainty, and combination risks."""
+
+    def test_risk_reason_and_minimization_recommendation(self, isolated_engine, mock_detector):
+        """Validates that risk reasoning and data minimization recommendations are generated per category."""
+        text = "Key: sk-secret1234567890123456. Patient John Doe has diabetes diagnosis."
+        mock_detector.detect_all = MagicMock(return_value=[
+            RawDetection(
+                start=5, end=31, text="sk-secret1234567890123456", type_="API_KEY",
+                category="Developer Credentials", risk="High", confidence=0.99,
+                source="deterministic_rule", explanation="Secret key"
+            ),
+            RawDetection(
+                start=41, end=49, text="John Doe", type_="PERSON",
+                category="Contact PII", risk="Medium", confidence=0.92,
+                source="gliner_ai", explanation="Patient name"
+            ),
+            RawDetection(
+                start=54, end=62, text="diabetes", type_="MEDICAL_CONDITION",
+                category="Protected Health Information (PHI)", risk="High", confidence=0.88,
+                source="gliner_ai", explanation="Clinical condition"
+            ),
+        ])
+
+        response = isolated_engine.process_scan(text=text, task="Clinical Audit", privacy_mode="strict")
+        findings_by_type = {f.type: f for f in response.findings}
+
+        # Developer Credentials -> Remove
+        cred = findings_by_type["API_KEY"]
+        assert cred.recommendation == "Remove"
+        assert "unauthorized infrastructure" in cred.risk_reason
+
+        # Contact PII -> Replace with Placeholder
+        person = findings_by_type["PERSON"]
+        assert person.recommendation == "Replace with Placeholder"
+        assert "Direct personal contact" in person.risk_reason
+
+        # PHI -> Generalize
+        phi = findings_by_type["MEDICAL_CONDITION"]
+        assert phi.recommendation == "Generalize"
+        assert "HIPAA" in phi.risk_reason
+
+    def test_uncertainty_flag_for_low_confidence_or_short_tokens(self, isolated_engine, mock_detector):
+        """Borderline confidence (< 0.65) or short ambiguous tokens flag is_uncertain with explanation."""
+        text = "Meeting at AI Inc."
+        mock_detector.detect_all = MagicMock(return_value=[
+            RawDetection(
+                start=11, end=13, text="AI", type_="ORGANIZATION",
+                category="Organization Data", risk="Low", confidence=0.55,
+                source="gliner_ai", explanation="Short org acronym"
+            ),
+        ])
+
+        response = isolated_engine.process_scan(text=text, task="General Audit", privacy_mode="strict")
+        finding = response.findings[0]
+        assert finding.is_uncertain is True
+        assert finding.uncertainty_reason is not None
+        assert "0.55" in finding.uncertainty_reason
+
+    def test_combination_risks_triad_and_clinical_linkage(self, isolated_engine, mock_detector):
+        """Identifies quasi-identifier triads (Person + Location + Org) and clinical linkage risks."""
+        text = "Dr. Alice Morgan at City Hospital in Boston treated the patient."
+        mock_detector.detect_all = MagicMock(return_value=[
+            RawDetection(start=4, end=16, text="Alice Morgan", type_="PERSON", category="Contact PII",
+                         risk="Medium", confidence=0.95, source="gliner_ai", explanation="Name"),
+            RawDetection(start=20, end=33, text="City Hospital", type_="ORGANIZATION", category="Organization Data",
+                         risk="Low", confidence=0.90, source="gliner_ai", explanation="Hospital org"),
+            RawDetection(start=37, end=43, text="Boston", type_="LOCATION", category="Location Data",
+                         risk="Low", confidence=0.92, source="gliner_ai", explanation="City location"),
+        ])
+
+        response = isolated_engine.process_scan(text=text, task="Medical Staff Audit", privacy_mode="strict")
+        assert len(response.combination_risks) >= 1
+        triad_risk = next((r for r in response.combination_risks if r["risk_type"] == "Triad Re-Identification Risk"), None)
+        assert triad_risk is not None
+        assert triad_risk["severity"] == "High"
+        assert "PERSON" in triad_risk["entities_involved"]
+        assert "LOCATION" in triad_risk["entities_involved"]
+        assert "ORGANIZATION" in triad_risk["entities_involved"]
+        assert "PERSON" in response.quasi_identifiers
+        assert "LOCATION" in response.quasi_identifiers
+
+
 class TestUnitModelLoadingFailuresAndDegradedState:
     """Verifies that model failures are transparently exposed and never silently substituted."""
 
@@ -348,12 +431,13 @@ class TestApiEndpoints:
 
     def test_cors_headers(self, client):
         """OPTIONS preflight checks respect allowed CORS origins."""
-        res = client.options(
-            "/api/scan",
-            headers={
-                "Origin": "http://localhost:5173",
-                "Access-Control-Request-Method": "POST",
-            },
-        )
-        assert res.status_code == 200
-        assert res.headers.get("access-control-allow-origin") == "http://localhost:5173"
+        for origin in ("http://localhost:5173", "http://127.0.0.1:5173"):
+            res = client.options(
+                "/api/scan",
+                headers={
+                    "Origin": origin,
+                    "Access-Control-Request-Method": "POST",
+                },
+            )
+            assert res.status_code == 200
+            assert res.headers.get("access-control-allow-origin") == origin

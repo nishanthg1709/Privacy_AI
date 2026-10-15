@@ -69,7 +69,7 @@ export default function LandingPage() {
             <div className="pg-metric-divider"></div>
             <div className="pg-metric-cell">
               <span className="pg-metric-value">100%</span>
-              <span className="pg-metric-label">Client-Side Demo Simulation</span>
+              <span className="pg-metric-label">Local Memory Execution</span>
             </div>
           </div>
         </div>

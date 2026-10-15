@@ -24,7 +24,7 @@ import Button from '../components/Button';
  * Strictly calculates metrics from actual scans performed in this session.
  * Never fabricates historical scans or fake privacy scores.
  */
-export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [] }) {
+export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], isCloud = false }) {
   const navigate = useNavigate();
 
   const handleGo = (pageId) => {
@@ -122,14 +122,15 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [] }
         </div>
 
         {/* Live Architecture Status Note */}
-        <div className="pg-workspace-demo-callout" role="note">
-          <div className="pg-demo-callout-header">
+        <div className="pg-workspace-status-callout" role="note">
+          <div className="pg-status-callout-header">
             <Sparkles size={14} className="pg-text-cream" />
             <strong>Real-time Telemetry Gateway</strong>
           </div>
           <p>
-            Metrics and audit records below reflect actual prompt scans processed during this active
-            session. Database persistence will be synchronized as the backend API is expanded.
+            {isCloud
+              ? 'Metrics and audit records below reflect authenticated telemetry synchronized with your Supabase PostgreSQL database under Row Level Security.'
+              : 'Metrics and audit records below reflect actual prompt scans processed during this active session. Cloud persistence synchronizes when logged in via Supabase.'}
           </p>
         </div>
       </section>
@@ -143,8 +144,12 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [] }
               Cumulative metrics derived strictly from actual session scans
             </p>
           </div>
-          <span className="pg-badge-demo-pill">
-            {totalScans === 0 ? 'Awaiting First Scan' : 'Live Session Telemetry'}
+          <span className="pg-badge-status-pill">
+            {totalScans === 0
+              ? 'Awaiting First Scan'
+              : isCloud
+              ? 'Supabase Cloud Telemetry'
+              : 'Live Session Telemetry'}
           </span>
         </div>
 

@@ -79,7 +79,10 @@ class PrivacyEngine:
             privacy_mode=mode,
         )
 
-        # 5. Compute summary, metrics, and privacy score
+        # 5. Contextual combination risk analysis
+        combination_risks, quasi_identifiers = self._analyze_combination_risks(findings)
+
+        # 6. Compute summary, metrics, and privacy score
         counts = {
             "total": len(findings),
             "high": sum(1 for f in findings if f.risk == "High"),
@@ -127,6 +130,8 @@ class PrivacyEngine:
             privacy_score=privacy_score,
             engine_status=engine_status,
             verification=verification,
+            combination_risks=combination_risks,
+            quasi_identifiers=quasi_identifiers,
         )
 
     def _apply_strictness_filter(
@@ -184,6 +189,15 @@ class PrivacyEngine:
                 synthetic_counters=synthetic_counters,
             )
 
+            # Evaluate context-aware risk, data minimization recommendations, and uncertainty
+            (
+                risk_reason,
+                recommendation,
+                recommendation_reason,
+                is_uncertain,
+                uncertainty_reason,
+            ) = self._generate_finding_intelligence(det, task, privacy_mode)
+
             finding = Finding(
                 id=idx,
                 type=det.type_,
@@ -199,6 +213,11 @@ class PrivacyEngine:
                 explanation=det.explanation,
                 is_ambiguous=is_ambiguous,
                 ambiguity_reason=ambiguity_reason,
+                risk_reason=risk_reason,
+                recommendation=recommendation,
+                recommendation_reason=recommendation_reason,
+                is_uncertain=is_uncertain,
+                uncertainty_reason=uncertainty_reason,
             )
             finding_plans.append((det.start, det.end, replacement, finding))
 
@@ -448,6 +467,99 @@ class PrivacyEngine:
 
         score = max(55.0, min(100.0, 100.0 - mitigated_penalty))
         return round(score, 1)
+
+    def _generate_finding_intelligence(
+        self,
+        detection: RawDetection,
+        task: str,
+        privacy_mode: str,
+    ) -> Tuple[str, str, str, bool, Optional[str]]:
+        """Calculate documented risk reason, minimization recommendation, and uncertainty."""
+        category = detection.category
+        entity_type = detection.type_
+        confidence = detection.confidence
+
+        # 1. Documented risk reasons based on sensitivity & exposure
+        if category == "Developer Credentials":
+            risk_reason = "Exposure of secret keys or credentials enables unauthorized infrastructure or API access."
+            recommendation = "Remove"
+            recommendation_reason = "Credentials are never valid in generative model prompts; complete removal is mandated."
+        elif category in ("Government ID", "Financial Data"):
+            risk_reason = f"High statutory sensitivity: {entity_type} is subject to strict non-disclosure under GDPR/HIPAA."
+            recommendation = "Replace with Placeholder"
+            recommendation_reason = "Preserves entity reference count and grammar without exposing authentic identifiers."
+        elif category == "Protected Health Information (PHI)":
+            risk_reason = "Protected Health Information: individual medical details create direct HIPAA privacy exposure."
+            recommendation = "Generalize"
+            recommendation_reason = "Generalize clinical terms or replace with standard token to mitigate medical re-identification."
+        elif category == "Contact PII":
+            risk_reason = "Direct personal contact identifier: enables individual identification or unsolicited outreach."
+            recommendation = "Replace with Placeholder"
+            recommendation_reason = "Preserves conversational context while safeguarding personal contact channels."
+        elif category in ("Location Data", "Organization Data"):
+            risk_reason = "Quasi-identifier: low risk in isolation, but can identify individuals when combined with other traits."
+            recommendation = "Generalize"
+            recommendation_reason = "Mask fine-grained geographic or organizational details to break linkage chains."
+        else:
+            risk_reason = f"Identified sensitive data in category '{category}'."
+            recommendation = "Replace with Placeholder"
+            recommendation_reason = "Data minimization default to prevent model memorization."
+
+        # 2. Uncertainty assessment
+        is_uncertain = False
+        uncertainty_reason = None
+        if confidence < 0.65:
+            is_uncertain = True
+            uncertainty_reason = f"Detector confidence ({confidence:.2f}) is below standard high-certainty baseline (0.65). Human verification advised."
+        elif len(detection.text.strip()) <= 2 and entity_type in ("ORGANIZATION", "LOCATION"):
+            is_uncertain = True
+            uncertainty_reason = f"Short token '{detection.text}' may be an abbreviation or common noun rather than a verified entity."
+
+        return risk_reason, recommendation, recommendation_reason, is_uncertain, uncertainty_reason
+
+    def _analyze_combination_risks(self, findings: List[Finding]) -> Tuple[List[Dict[str, Any]], List[str]]:
+        """Identify potentially identifying quasi-identifier combinations in the scanned payload."""
+        types_present = {f.type for f in findings}
+        categories_present = {f.category for f in findings}
+
+        combination_risks: List[Dict[str, Any]] = []
+        quasi_identifiers: Set[str] = set()
+
+        for f in findings:
+            if f.type in ("PERSON", "LOCATION", "ORGANIZATION", "DATE_OF_BIRTH", "IP_ADDRESS"):
+                quasi_identifiers.add(f.type)
+
+        # Combination 1: Person + Location + Organization (Classic linkage attack)
+        if "PERSON" in types_present and "LOCATION" in types_present and "ORGANIZATION" in types_present:
+            combination_risks.append({
+                "risk_type": "Triad Re-Identification Risk",
+                "severity": "High",
+                "entities_involved": ["PERSON", "LOCATION", "ORGANIZATION"],
+                "description": "The co-occurrence of a personal name, specific location, and employer/organization significantly narrows the candidate pool, allowing external linkage even if direct IDs are removed.",
+                "mitigation": "Ensure both person and fine-grained location tokens are minimized."
+            })
+
+        # Combination 2: Person + Protected Health Information
+        if "PERSON" in types_present and "Protected Health Information (PHI)" in categories_present:
+            combination_risks.append({
+                "risk_type": "Direct Clinical Linkage",
+                "severity": "Critical",
+                "entities_involved": ["PERSON", "PHI"],
+                "description": "Patient identity co-occurs with medical conditions or clinical IDs. Direct breach of HIPAA Safe Harbor de-identification rules.",
+                "mitigation": "Redact both identity tokens and clinical identifiers completely."
+            })
+
+        # Combination 3: Contact PII + Developer Credentials
+        if "Developer Credentials" in categories_present and "Contact PII" in categories_present:
+            combination_risks.append({
+                "risk_type": "Credential Attribution Risk",
+                "severity": "High",
+                "entities_involved": ["Developer Credentials", "Contact PII"],
+                "description": "Private keys or tokens appear alongside an engineer's email or identity, enabling targeted account takeover or credential harvesting.",
+                "mitigation": "Immediate credential revocation and total prompt token elimination."
+            })
+
+        return combination_risks, sorted(list(quasi_identifiers))
 
     def _generate_summary(
         self,

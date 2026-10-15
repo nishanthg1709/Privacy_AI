@@ -290,13 +290,13 @@ export default function FeatureSection() {
           </h2>
           <p className="pg-cta-description">
             Experience real-time PII detection, synthetic anonymization, and verifiable audit trails.
-            No credit card or backend installation required for this interactive demonstration.
+            Zero external AI APIs. Sensitive document processing runs locally on your machine.
           </p>
 
           <div className="pg-cta-button-row">
             <Link to="/signup">
               <Button variant="primary" size="lg" iconAfter={ArrowRight}>
-                Get Started with Demo Account
+                Get Started with PrivacyGuard
               </Button>
             </Link>
             <Link to="/app/scanner">

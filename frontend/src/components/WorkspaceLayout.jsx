@@ -63,7 +63,7 @@ export default function WorkspaceLayout({
         onNavigate={handleNavigate}
         isMobileOpen={isMobileNavOpen}
         onCloseMobile={() => setIsMobileNavOpen(false)}
-        onShowDemoInfo={() => setShowSpecsModal(true)}
+        onShowSpecs={() => setShowSpecsModal(true)}
         onLogout={handleLogout}
         user={user}
       />
@@ -119,7 +119,7 @@ export default function WorkspaceLayout({
               title="Architecture details"
             >
               <Info size={14} />
-              <span className="pg-hide-mobile">Demo Specs</span>
+              <span className="pg-hide-mobile">System Specs</span>
             </button>
 
             {/* User Dropdown Menu */}
@@ -132,11 +132,11 @@ export default function WorkspaceLayout({
                 aria-label="User account menu"
               >
                 <div className="pg-user-avatar">
-                  {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                  {user?.name ? user.name.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'U')}
                 </div>
                 <div className="pg-user-menu-text pg-hide-mobile">
-                  <span className="pg-user-menu-name">{user?.name || 'Security Officer'}</span>
-                  <span className="pg-user-menu-role">{user?.role || 'Demo Admin'}</span>
+                  <span className="pg-user-menu-name">{user?.name || (user?.email ? user.email.split('@')[0] : 'Security Officer')}</span>
+                  <span className="pg-user-menu-role">{user?.role || 'Security Officer'}</span>
                 </div>
                 <ChevronDown size={14} className="pg-text-cream-subtle" />
               </button>
@@ -149,9 +149,9 @@ export default function WorkspaceLayout({
                   />
                   <div className="pg-user-dropdown-menu" role="menu">
                     <div className="pg-dropdown-header">
-                      <div className="pg-dropdown-user-name">{user?.name || 'Alex Morgan'}</div>
-                      <div className="pg-dropdown-user-email">{user?.email || 'demo@privacyguard.ai'}</div>
-                      <div className="pg-dropdown-badge">Simulated Demo Account</div>
+                      <div className="pg-dropdown-user-name">{user?.name || (user?.email ? user.email.split('@')[0] : 'Security Officer')}</div>
+                      <div className="pg-dropdown-user-email">{user?.email || 'Authenticated User'}</div>
+                      <div className="pg-dropdown-badge">{user?.email ? 'Supabase Authenticated' : 'Active Session'}</div>
                     </div>
 
                     <div className="pg-dropdown-divider" />
@@ -252,33 +252,35 @@ export default function WorkspaceLayout({
 
             <div className="pg-modal-body">
               <div className="pg-milestone-step">
-                <span className="pg-step-badge pg-step-current">Active Milestone</span>
-                <h4>Editorial Web Application &amp; Authentication Flow</h4>
+                <span className="pg-step-badge pg-step-current">Local AI Engine</span>
+                <h4>GLiNER + Presidio Neural Detection Pipeline</h4>
                 <p>
-                  Comprehensive dark/cream design system, public landing page, interactive demo authentication,
-                  and redesigned workspace with Privacy Scanner, Diff Inspection, and Audit Log History.
+                  Contextual entity detection powered by local GLiNER (<code>urchade/gliner_small-v2.1</code>)
+                  coupled with Microsoft Presidio and deterministic credential recognizers running entirely on CPU.
                 </p>
               </div>
 
               <div className="pg-milestone-step">
-                <span className="pg-step-badge">Milestone 2 (Upcoming)</span>
-                <h4>Deterministic Regex &amp; Client-Side Redaction Engine</h4>
+                <span className="pg-step-badge pg-step-current">Zero-Log Architecture</span>
+                <h4>In-Memory Sanitization &amp; Privacy Verification</h4>
                 <p>
-                  Wiring live pattern extraction for emails, credit cards, phones, SSNs, and developer secrets.
+                  Documents are processed in-memory. Original text, protected text, and detected PII values are never
+                  persisted to database storage or logged to disk.
                 </p>
               </div>
 
               <div className="pg-milestone-step">
-                <span className="pg-step-badge">Milestone 3 (Upcoming)</span>
-                <h4>Supabase Auth &amp; Persistent Audit Infrastructure</h4>
+                <span className="pg-step-badge pg-step-current">Security &amp; Compliance</span>
+                <h4>Supabase Auth &amp; Row Level Security</h4>
                 <p>
-                  Swapping local demo authentication with Supabase Auth, persistent database records, and verifiable compliance exports.
+                  Telemetry records are restricted strictly to authenticated owners using PostgreSQL Row Level Security
+                  policies (<code>auth.uid() = user_id</code>).
                 </p>
               </div>
             </div>
 
             <div className="pg-modal-footer">
-              <span className="pg-text-muted-sm">All telemetry displayed is simulated demo data.</span>
+              <span className="pg-text-muted-sm">All detection and minimization executes locally on your machine.</span>
               <Button variant="primary" size="sm" onClick={() => setShowSpecsModal(false)}>
                 Dismiss
               </Button>

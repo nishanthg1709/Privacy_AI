@@ -1,94 +1,103 @@
 /**
- * PrivacyGuard AI - Authentication Service (Demo Implementation)
+ * PrivacyGuard AI - Authentication Service
  *
- * NOTE: This is an explicitly labeled local demo authentication service.
- * It simulates user registration, login validation, session persistence,
- * and profile retrieval. It is architected so that Supabase Auth, Auth0,
- * or a custom FastAPI/Express backend can replace these methods directly.
+ * Direct Supabase Auth integration with real session management via supabase.auth.getSession()
+ * and supabase.auth.onAuthStateChange().
+ *
+ * Security & Integrity:
+ * - Requires real authenticated Supabase sessions.
+ * - No mock sessions, demo bypasses, or fabricated credentials.
+ * - Only uses publishable/anon keys; never service-role secrets.
+ * - Token management is handled securely by @supabase/supabase-js.
  */
 
-const STORAGE_KEY = 'pg_auth_session';
-const USERS_STORE_KEY = 'pg_registered_users';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 
-// Demo initial user for testing
-const DEMO_DEFAULT_USER = {
-  id: 'usr_demo_01',
-  name: 'Alex Morgan',
-  email: 'alex.morgan@privacyguard.ai',
-  organization: 'Cyberdyne Systems (Demo)',
-  role: 'Chief Privacy Officer',
-  joinedDate: '2026-10-15',
-  isDemoAccount: true,
-};
+const LEGACY_STORAGE_KEY = 'pg_auth_session';
+const LEGACY_USERS_STORE_KEY = 'pg_registered_users';
+
+// Purge any lingering legacy mock sessions from browser storage
+try {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_USERS_STORE_KEY);
+    sessionStorage.removeItem(LEGACY_STORAGE_KEY);
+  }
+} catch {
+  // storage unavailable
+}
 
 class AuthService {
   /**
-   * Retrieve currently active user session
+   * Check if Supabase cloud authentication is configured and active
    */
-  getCurrentUser() {
-    try {
-      const session = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
-      if (!session) return null;
-      return JSON.parse(session);
-    } catch {
+  isCloudConfigured() {
+    return isSupabaseConfigured() && Boolean(supabase);
+  }
+
+  /**
+   * Check whether a real Supabase session exists on initial boot / page refresh
+   */
+  async getInitialSession() {
+    if (!this.isCloudConfigured() || !supabase) {
       return null;
     }
+
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.warn('[PrivacyGuard AI] Supabase getSession error:', error.message);
+        return null;
+      }
+
+      if (data?.session?.user) {
+        return this._mapSupabaseUser(data.session.user);
+      }
+    } catch (err) {
+      console.warn('[PrivacyGuard AI] Session verification error:', err);
+    }
+
+    return null;
   }
 
   /**
-   * Check if a session exists
+   * Authenticate a user with email and password via Supabase Auth
    */
-  isAuthenticated() {
-    return Boolean(this.getCurrentUser());
-  }
-
-  /**
-   * Authenticate a user with email and password
-   */
-  async login({ email, password, rememberMe = true }) {
-    // Simulate network latency (250ms)
-    await new Promise((resolve) => setTimeout(resolve, 250));
-
-    const cleanEmail = email.trim().toLowerCase();
+  async login({ email, password }) {
+    const cleanEmail = (email || '').trim().toLowerCase();
 
     if (!cleanEmail || !password) {
-      throw new Error('Please provide both your email and password.');
+      throw new Error('Please enter both your email address and password.');
     }
 
-    // Check stored demo users
-    const registeredUsers = this._getRegisteredUsers();
-    let matchedUser = registeredUsers.find((u) => u.email.toLowerCase() === cleanEmail);
-
-    // If not found in custom registered users, accept demo user or create session for demo email
-    if (!matchedUser) {
-      if (cleanEmail === DEMO_DEFAULT_USER.email.toLowerCase()) {
-        matchedUser = DEMO_DEFAULT_USER;
-      } else {
-        // In local demo mode, create user object on the fly for ease of review
-        matchedUser = {
-          id: `usr_${Date.now()}`,
-          name: cleanEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-          email: cleanEmail,
-          organization: 'Enterprise Workspace (Demo)',
-          role: 'Security Engineer',
-          joinedDate: new Date().toISOString().split('T')[0],
-          isDemoAccount: true,
-        };
-      }
+    if (!this.isCloudConfigured() || !supabase) {
+      throw new Error(
+        'Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to frontend/.env.'
+      );
     }
 
-    this._saveSession(matchedUser, rememberMe);
-    return matchedUser;
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Authentication failed. Please verify your credentials.');
+    }
+
+    if (!data?.user) {
+      throw new Error('No user data returned from Supabase authentication.');
+    }
+
+    return this._mapSupabaseUser(data.user);
   }
 
   /**
-   * Register a new user in local demo store
+   * Register a new user via Supabase Auth
    */
-  async signup({ name, email, password, rememberMe = true }) {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanName = name.trim();
+  async signup({ name, email, password }) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanName = (name || '').trim();
 
     if (!cleanName) throw new Error('Please enter your full name.');
     if (!cleanEmail || !cleanEmail.includes('@')) throw new Error('Please enter a valid work email.');
@@ -96,68 +105,69 @@ class AuthService {
       throw new Error('Password must be at least 8 characters in length.');
     }
 
-    const newUser = {
-      id: `usr_${Date.now()}`,
-      name: cleanName,
-      email: cleanEmail,
-      organization: 'Enterprise Workspace (Demo)',
-      role: 'Privacy Administrator',
-      joinedDate: new Date().toISOString().split('T')[0],
-      isDemoAccount: true,
-    };
-
-    // Store in registered users list
-    const users = this._getRegisteredUsers();
-    users.push(newUser);
-    try {
-      localStorage.setItem(USERS_STORE_KEY, JSON.stringify(users));
-    } catch {
-      // storage unavailable
+    if (!this.isCloudConfigured() || !supabase) {
+      throw new Error(
+        'Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to frontend/.env.'
+      );
     }
 
-    this._saveSession(newUser, rememberMe);
-    return newUser;
+    const { data, error } = await supabase.auth.signUp({
+      email: cleanEmail,
+      password,
+      options: {
+        data: {
+          full_name: cleanName,
+          name: cleanName,
+          organization: 'Enterprise Workspace',
+          role: 'Privacy Administrator',
+        },
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Registration failed.');
+    }
+
+    if (!data?.user) {
+      throw new Error('Registration failed: no user returned from Supabase.');
+    }
+
+    const emailConfirmationPending = !data.session;
+    return this._mapSupabaseUser(data.user, emailConfirmationPending);
   }
 
   /**
-   * One-click demo sign in
+   * Log out and clear active session from Supabase
    */
-  async demoLogin() {
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    this._saveSession(DEMO_DEFAULT_USER, true);
-    return DEMO_DEFAULT_USER;
-  }
-
-  /**
-   * Log out and clear active session
-   */
-  logout() {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      sessionStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // noop
+  async logout() {
+    if (this.isCloudConfigured() && supabase) {
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn('[PrivacyGuard AI] Supabase signOut error:', err);
+      }
     }
   }
 
   // --- Private Helpers ---
 
-  _saveSession(user, rememberMe) {
-    const data = JSON.stringify(user);
-    if (rememberMe) {
-      localStorage.setItem(STORAGE_KEY, data);
-    } else {
-      sessionStorage.setItem(STORAGE_KEY, data);
-    }
-  }
-
-  _getRegisteredUsers() {
-    try {
-      const data = localStorage.getItem(USERS_STORE_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
+  _mapSupabaseUser(sbUser, emailConfirmationPending = false) {
+    if (!sbUser) return null;
+    const meta = sbUser.user_metadata || {};
+    return {
+      id: sbUser.id,
+      email: sbUser.email,
+      name:
+        meta.full_name ||
+        meta.name ||
+        (sbUser.email ? sbUser.email.split('@')[0] : 'Workspace User'),
+      organization: meta.organization || 'Enterprise Workspace',
+      role: meta.role || 'Privacy Administrator',
+      joinedDate: sbUser.created_at
+        ? sbUser.created_at.split('T')[0]
+        : new Date().toISOString().split('T')[0],
+      emailConfirmationPending,
+    };
   }
 }
 

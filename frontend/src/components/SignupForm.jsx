@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import Button from './Button';
 
 /**
  * Editorial SignupForm Component
  * Full registration flow with password strength calculation,
- * password matching confirmation, terms validation, and instant demo quick register.
+ * password matching confirmation, terms validation, and Supabase Auth integration.
  */
 export default function SignupForm() {
-  const { signup, demoLogin, isLoading } = useAuth();
+  const { signup, isAuthenticated, isLoading, isCloudConfigured } = useAuth();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -21,6 +21,14 @@ export default function SignupForm() {
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [error, setError] = useState('');
   const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const [confirmationNotice, setConfirmationNotice] = useState(null);
+
+  // If already authenticated, redirect to workspace
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/app/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   // Compute password strength
   const calculateStrength = (pwd) => {
@@ -50,6 +58,7 @@ export default function SignupForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setConfirmationNotice(null);
 
     if (!name.trim()) {
       setError('Please provide your full name.');
@@ -72,40 +81,57 @@ export default function SignupForm() {
     }
 
     if (!agreeTerms) {
-      setError('You must accept the terms of service and demonstration disclosure.');
+      setError('You must accept the terms of service.');
+      return;
+    }
+
+    if (!isCloudConfigured) {
+      setError(
+        'Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to frontend/.env.'
+      );
       return;
     }
 
     try {
-      await signup({ name, email, password });
-      navigate('/app/dashboard');
+      const newUser = await signup({ name, email, password });
+      if (newUser?.emailConfirmationPending) {
+        setConfirmationNotice(
+          `Account registered for ${email}. Please check your email inbox to verify your address before signing in.`
+        );
+      } else {
+        navigate('/app/dashboard');
+      }
     } catch (err) {
       setError(err.message || 'Registration failed.');
     }
   };
 
-  const handleDemoQuickRegister = async () => {
-    setError('');
-    try {
-      await demoLogin();
-      navigate('/app/dashboard');
-    } catch {
-      setError('Unable to initialize demo account.');
-    }
-  };
-
   return (
     <div className="pg-signup-form-root">
-      {/* Demo Notification Banner */}
-      <div className="pg-auth-demo-banner" role="status">
-        <div className="pg-auth-demo-header">
+      {/* Auth Banner */}
+      <div className="pg-auth-status-banner" role="status">
+        <div className="pg-auth-status-header">
           <Sparkles size={14} className="pg-text-cream" />
-          <span>Local Demonstration Account</span>
+          <span>
+            {isCloudConfigured
+              ? 'Supabase Cloud Registration Active'
+              : 'Supabase Credentials Required'}
+          </span>
         </div>
-        <p className="pg-auth-demo-desc">
-          Signups are saved to your browser session. Backend Supabase/OAuth registration connects in subsequent milestones.
+        <p className="pg-auth-status-desc">
+          {isCloudConfigured
+            ? 'New accounts are registered directly in your Supabase Auth project.'
+            : 'Supabase credentials are not detected in frontend/.env. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to enable registration.'}
         </p>
       </div>
+
+      {/* Confirmation Sent Banner */}
+      {confirmationNotice && (
+        <div className="pg-auth-info-banner" role="status">
+          <CheckCircle2 size={16} />
+          <span>{confirmationNotice}</span>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
@@ -244,7 +270,7 @@ export default function SignupForm() {
                   setTermsModalOpen(true);
                 }}
               >
-                Demonstration Terms &amp; Privacy Policy
+                Terms of Service &amp; Privacy Policy
               </button>
             </span>
           </label>
@@ -256,23 +282,11 @@ export default function SignupForm() {
           variant="primary"
           size="lg"
           isLoading={isLoading}
+          disabled={isLoading || !isCloudConfigured}
           iconAfter={ArrowRight}
           className="pg-w-full"
         >
           Create Workspace Account
-        </Button>
-
-        {/* 1-Click Demo Shortcut */}
-        <Button
-          type="button"
-          variant="secondary"
-          size="md"
-          icon={Sparkles}
-          onClick={handleDemoQuickRegister}
-          disabled={isLoading}
-          className="pg-w-full pg-mt-3"
-        >
-          Demo Quick Access (Skip Form)
         </Button>
       </form>
 
@@ -294,16 +308,16 @@ export default function SignupForm() {
             aria-modal="true"
           >
             <div className="pg-modal-header">
-              <h3>Demonstration Terms of Service</h3>
+              <h3>Terms of Service &amp; Privacy Governance</h3>
             </div>
             <div className="pg-modal-body">
               <p>
-                PrivacyGuard AI is currently provided as a local demonstration frontend. All user accounts,
-                passwords, and session tokens are simulated within your browser storage.
+                PrivacyGuard AI minimizes sensitive tokens before payload dispatch to model providers.
+                Accounts and scan telemetry are maintained in your designated Supabase PostgreSQL instance under strict
+                Row Level Security (RLS).
               </p>
               <p>
-                No personally identifiable information is sent to external servers during this demo preview.
-                Live NLP entity extraction models and database persistence connect in Milestones 2 and 3.
+                Original documents and raw detected PII values are never retained in cloud storage.
               </p>
             </div>
             <div className="pg-modal-footer">

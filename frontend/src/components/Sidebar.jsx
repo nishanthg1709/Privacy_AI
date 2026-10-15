@@ -24,7 +24,7 @@ export default function Sidebar({
   onNavigate,
   isMobileOpen,
   onCloseMobile,
-  onShowDemoInfo,
+  onShowSpecs,
   onLogout,
   user
 }) {
@@ -115,13 +115,13 @@ export default function Sidebar({
           )}
         </div>
 
-        {/* Workspace Label & Demo Status */}
+        {/* Workspace Label & Status */}
         <div className="pg-sidebar-status-box">
           <div className="pg-status-indicator-group">
             <span className="pg-pulse-dot" aria-hidden="true"></span>
-            <span className="pg-sidebar-status-title">Demo Workspace</span>
+            <span className="pg-sidebar-status-title">Privacy Workspace</span>
           </div>
-          <span className="pg-sidebar-status-pill">Interactive</span>
+          <span className="pg-sidebar-status-pill">Active</span>
         </div>
 
         {/* Navigation Items */}
@@ -173,18 +173,18 @@ export default function Sidebar({
           <div className="pg-engine-card">
             <div className="pg-engine-header">
               <Activity size={14} className="pg-engine-icon" />
-              <span className="pg-engine-title">Interception Gateway</span>
+              <span className="pg-engine-title">Local Engine Pipeline</span>
             </div>
-            <div className="pg-engine-status-pill">Active Simulation</div>
-            <p className="pg-engine-hint">Live NLP regex connects in Milestone 2</p>
-            {onShowDemoInfo && (
+            <div className="pg-engine-status-pill">GLiNER + Presidio</div>
+            <p className="pg-engine-hint">Neural Contextual &amp; Pattern Detectors</p>
+            {onShowSpecs && (
               <button
                 type="button"
                 className="pg-engine-info-btn"
-                onClick={onShowDemoInfo}
+                onClick={onShowSpecs}
               >
                 <Info size={12} />
-                <span>Roadmap Specs</span>
+                <span>Architecture Specs</span>
               </button>
             )}
           </div>
@@ -192,10 +192,10 @@ export default function Sidebar({
           {/* User Profile Bar with Logout */}
           <div className="pg-sidebar-user-card">
             <div className="pg-user-avatar">
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+              {user?.name ? user.name.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'U')}
             </div>
             <div className="pg-user-details">
-              <span className="pg-user-name">{user?.name || 'Alex Morgan'}</span>
+              <span className="pg-user-name">{user?.name || (user?.email ? user.email.split('@')[0] : 'Security Officer')}</span>
               <span className="pg-user-role">{user?.role || 'Security Officer'}</span>
             </div>
             {onLogout && (
@@ -203,7 +203,7 @@ export default function Sidebar({
                 type="button"
                 className="pg-sidebar-logout-btn"
                 onClick={onLogout}
-                title="Log out of demo session"
+                title="Sign out of session"
                 aria-label="Log out"
               >
                 <LogOut size={15} />

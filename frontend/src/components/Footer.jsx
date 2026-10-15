@@ -57,7 +57,7 @@ export default function Footer() {
             <h4 className="pg-footer-nav-title">Access</h4>
             <ul className="pg-footer-nav-list">
               <li><Link to="/login" className="pg-footer-nav-link">Enterprise Sign In</Link></li>
-              <li><Link to="/signup" className="pg-footer-nav-link">Create Demo Account</Link></li>
+              <li><Link to="/signup" className="pg-footer-nav-link">Create Account</Link></li>
               <li>
                 <a
                   href="https://github.com/nishanthg1709/Prg_AI"
@@ -79,8 +79,8 @@ export default function Footer() {
             &copy; {currentYear} PrivacyGuard AI. All rights reserved. Built for sovereign AI governance.
           </div>
           <div className="pg-footer-notice">
-            <span className="pg-footer-status-pill">Interactive Demo Preview</span>
-            <span>All metrics and detection events in this milestone are simulated demonstration records.</span>
+            <span className="pg-footer-status-pill">Local AI Engine Ready</span>
+            <span>Document processing and entity detection run locally. Telemetry complies with zero-log privacy standards.</span>
           </div>
         </div>
       </div>

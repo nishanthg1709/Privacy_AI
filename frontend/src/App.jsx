@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/useAuth';
+import historyService from './services/historyService';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
@@ -14,13 +16,16 @@ import ScanHistory from './pages/ScanHistory';
 import Settings from './pages/Settings';
 
 /**
- * Main Application Root
- * Sets up routing, AuthProvider, shared workspace telemetry state,
- * and toast alert notifications.
+ * Inner Application Controller
+ * Has direct access to useAuth() context, manages scan telemetry state,
+ * synchronizes with Supabase scan_history when authenticated, and coordinates notifications.
  */
-function App() {
+function AppContent() {
+  const { user, isCloudConfigured } = useAuth();
   const [selectedScanData, setSelectedScanData] = useState(null);
   const [toast, setToast] = useState(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [cloudSyncError, setCloudSyncError] = useState(null);
 
   // App settings state with local persistence
   const [appSettings, setAppSettings] = useState(() => {
@@ -48,21 +53,7 @@ function App() {
     }
   });
 
-  // Auto-dismiss toast
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => {
-        setToast(null);
-      }, 3500);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  const showToast = (message, type = 'info') => {
-    setToast({ message, type });
-  };
-
-  // Persistent session scan history state (populated strictly from actual scans)
+  // Persistent session scan history state (populated from actual scans)
   const [scanHistory, setScanHistory] = useState(() => {
     try {
       const saved = sessionStorage.getItem('pg_session_scan_history');
@@ -71,6 +62,70 @@ function App() {
       return [];
     }
   });
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type });
+  };
+
+  // Reset session history on logout
+  useEffect(() => {
+    if (!user) {
+      Promise.resolve().then(() => {
+        setScanHistory((prev) => (prev.length > 0 ? [] : prev));
+      });
+      try {
+        sessionStorage.removeItem('pg_session_scan_history');
+      } catch {
+        // storage unavailable
+      }
+    }
+  }, [user]);
+
+  // Sync scan history from Supabase when an authenticated user is active
+  useEffect(() => {
+    let active = true;
+
+    if (user && isCloudConfigured) {
+      Promise.resolve().then(async () => {
+        if (!active) return;
+        setIsLoadingHistory(true);
+        try {
+          const res = await historyService.fetchScanHistory(user);
+          if (!active) return;
+          if (res.fromCloud) {
+            setCloudSyncError(null);
+            setScanHistory((prev) => {
+              // Merge cloud records with local session scans without duplicate IDs
+              const cloudIds = new Set(res.records.map((r) => r.scanId));
+              const localOnly = prev.filter((item) => !cloudIds.has(item.scanId));
+              return [...res.records, ...localOnly];
+            });
+          } else if (res.error) {
+            setCloudSyncError(res.error);
+          }
+        } catch (err) {
+          if (!active) return;
+          setCloudSyncError(err.message || 'Failed to sync scan history from Supabase');
+        } finally {
+          if (active) setIsLoadingHistory(false);
+        }
+      });
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [user, isCloudConfigured]);
 
   const handleSaveSettings = (newSettings) => {
     setAppSettings(newSettings);
@@ -82,8 +137,10 @@ function App() {
     showToast('Preferences updated and persisted.', 'success');
   };
 
-  const handleScannerFinished = (scanResult) => {
+  const handleScannerFinished = async (scanResult) => {
     setSelectedScanData(scanResult);
+
+    // 1. Always preserve the full scan result locally in memory and session storage
     setScanHistory((prev) => {
       const filtered = prev.filter((item) => item.scanId !== scanResult.scanId);
       const updated = [scanResult, ...filtered];
@@ -94,90 +151,124 @@ function App() {
       }
       return updated;
     });
-    showToast('Privacy scan completed successfully! Viewing inspected payload.', 'success');
+
+    // 2. If user is authenticated via Supabase, synchronize minimal telemetry metadata
+    if (user && isCloudConfigured) {
+      const saveRes = await historyService.saveScanHistory(scanResult, user);
+      if (saveRes.saved) {
+        showToast('Privacy scan complete! Telemetry metadata recorded to Supabase.', 'success');
+        setScanHistory((prev) =>
+          prev.map((item) =>
+            item.scanId === scanResult.scanId ? { ...item, persistedToCloud: true } : item
+          )
+        );
+      } else {
+        // Transparent feedback: Scan results remain 100% intact locally
+        const detail = saveRes.error ? ` (${saveRes.error})` : '';
+        showToast(
+          `Scan completed locally. Note: Cloud history sync unavailable${detail}. Result is preserved.`,
+          'info'
+        );
+      }
+    } else {
+      showToast('Privacy scan completed successfully! Viewing inspected payload.', 'success');
+    }
   };
 
   const handleSelectScanForInspection = (scan) => {
     setSelectedScanData(scan);
   };
 
+  const isCloudActive = Boolean(user && isCloudConfigured);
+
+  return (
+    <Routes>
+      {/* Public Landing Page */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* Authentication Routes */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+
+      {/* Protected Workspace Routes */}
+      <Route
+        path="/app"
+        element={
+          <ProtectedRoute>
+            <WorkspaceLayout
+              toast={toast}
+              setToast={setToast}
+              settings={appSettings}
+            />
+          </ProtectedRoute>
+        }
+      >
+        {/* Workspace Child Views */}
+        <Route index element={<Navigate to="/app/dashboard" replace />} />
+        <Route
+          path="dashboard"
+          element={
+            <Dashboard
+              scanHistory={scanHistory}
+              onSelectScan={handleSelectScanForInspection}
+              isCloud={isCloudActive}
+            />
+          }
+        />
+        <Route
+          path="scanner"
+          element={
+            <PrivacyScanner
+              onViewResults={handleScannerFinished}
+            />
+          }
+        />
+        <Route
+          path="results"
+          element={
+            <Results
+              scanData={selectedScanData}
+            />
+          }
+        />
+        <Route
+          path="history"
+          element={
+            <ScanHistory
+              scanHistory={scanHistory}
+              onSelectScan={handleSelectScanForInspection}
+              isLoadingHistory={isLoadingHistory}
+              cloudSyncError={cloudSyncError}
+              isCloud={isCloudActive}
+            />
+          }
+        />
+        <Route
+          path="settings"
+          element={
+            <Settings
+              settings={appSettings}
+              onSaveSettings={handleSaveSettings}
+            />
+          }
+        />
+      </Route>
+
+      {/* Fallback Catch-All */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+/**
+ * Main Application Root
+ */
+export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          {/* Public Landing Page */}
-          <Route path="/" element={<LandingPage />} />
-
-          {/* Authentication Routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-
-          {/* Protected Workspace Routes */}
-          <Route
-            path="/app"
-            element={
-              <ProtectedRoute>
-                <WorkspaceLayout
-                  toast={toast}
-                  setToast={setToast}
-                  settings={appSettings}
-                />
-              </ProtectedRoute>
-            }
-          >
-            {/* Workspace Child Views */}
-            <Route index element={<Navigate to="/app/dashboard" replace />} />
-            <Route
-              path="dashboard"
-              element={
-                <Dashboard
-                  scanHistory={scanHistory}
-                  onSelectScan={handleSelectScanForInspection}
-                />
-              }
-            />
-            <Route
-              path="scanner"
-              element={
-                <PrivacyScanner
-                  onViewResults={handleScannerFinished}
-                />
-              }
-            />
-            <Route
-              path="results"
-              element={
-                <Results
-                  scanData={selectedScanData}
-                />
-              }
-            />
-            <Route
-              path="history"
-              element={
-                <ScanHistory
-                  scanHistory={scanHistory}
-                  onSelectScan={handleSelectScanForInspection}
-                />
-              }
-            />
-            <Route
-              path="settings"
-              element={
-                <Settings
-                  settings={appSettings}
-                  onSaveSettings={handleSaveSettings}
-                />
-              }
-            />
-          </Route>
-
-          {/* Fallback Catch-All */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AppContent />
       </BrowserRouter>
     </AuthProvider>
   );
 }
-
-export default App;

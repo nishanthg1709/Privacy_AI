@@ -6,17 +6,26 @@ import {
   Download,
   Eye,
   Scan,
-  History
+  History,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import Button from '../components/Button';
 
 /**
  * Editorial ScanHistory Page Component
- * Searchable, filterable audit log strictly populated from actual session scans.
+ * Searchable, filterable audit log populated from Supabase RLS database and active session scans.
  * If no scans exist, presents an honest empty state.
  * Never fabricates mock records.
  */
-export default function ScanHistory({ onNavigate, onSelectScan, scanHistory = [] }) {
+export default function ScanHistory({
+  onNavigate,
+  onSelectScan,
+  scanHistory = [],
+  isLoadingHistory = false,
+  cloudSyncError = null,
+  isCloud = false,
+}) {
   const navigate = useNavigate();
 
   const handleGo = (pageId, data) => {
@@ -137,8 +146,28 @@ export default function ScanHistory({ onNavigate, onSelectScan, scanHistory = []
         </div>
       </div>
 
-      {/* Honest Empty State if no scans have been performed */}
-      {scanHistory.length === 0 ? (
+      {/* Supabase Cloud Sync Warning Notice */}
+      {cloudSyncError && (
+        <div className="pg-auth-error-banner pg-mb-4" role="alert">
+          <AlertCircle size={16} />
+          <span>
+            Supabase history notice: {cloudSyncError}. If you haven&rsquo;t run the database migration yet, please execute <code>supabase/schema.sql</code> in your Supabase SQL Editor. Session records are preserved.
+          </span>
+        </div>
+      )}
+
+      {/* Loading State or Honest Empty State */}
+      {isLoadingHistory ? (
+        <div className="pg-empty-state-card" role="status" aria-live="polite">
+          <div className="pg-empty-icon-wrap">
+            <RefreshCw size={36} className="pg-text-cream-subtle pg-spin" />
+          </div>
+          <h2 className="pg-empty-title">Loading Audit History...</h2>
+          <p className="pg-empty-desc">
+            Retrieving authenticated scan telemetry from your Supabase PostgreSQL database.
+          </p>
+        </div>
+      ) : scanHistory.length === 0 ? (
         <div className="pg-empty-state-card" role="region" aria-label="No Historical Scans">
           <div className="pg-empty-icon-wrap">
             <History size={36} className="pg-text-cream-subtle" />
@@ -211,10 +240,12 @@ export default function ScanHistory({ onNavigate, onSelectScan, scanHistory = []
               <div>
                 <h2 className="pg-section-title">Audit Records</h2>
                 <p className="pg-section-subtitle">
-                  Showing {filteredRecords.length} of {scanHistory.length} active session records
+                  Showing {filteredRecords.length} of {scanHistory.length} active records
                 </p>
               </div>
-              <span className="pg-badge-demo-inline">Live Session Storage</span>
+              <span className="pg-badge-status-inline">
+                {isCloud ? 'Supabase Cloud RLS' : 'Live Session Storage'}
+              </span>
             </div>
 
             {filteredRecords.length === 0 ? (

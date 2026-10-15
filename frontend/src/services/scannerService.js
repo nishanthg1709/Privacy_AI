@@ -175,8 +175,20 @@ export async function scanPayload({ text, task, privacy_mode, strictness = 'gdpr
         finding.masked ||
         '[PROTECTED]',
       confidence: formatConfidence(finding.confidence || finding.score),
+      rawConfidence: typeof finding.confidence === 'number' ? finding.confidence : null,
       risk: finding.risk || finding.severity || inferRisk(finding.type || finding.label),
       action: finding.action || finding.action_taken || (privacy_mode === 'synthetic' ? 'Substituted' : 'Redacted'),
+      source: finding.source || 'gliner_ai',
+      explanation: finding.explanation || '',
+      is_ambiguous: Boolean(finding.is_ambiguous),
+      ambiguity_reason: finding.ambiguity_reason || null,
+      risk_reason: finding.risk_reason || null,
+      recommendation: finding.recommendation || null,
+      recommendation_reason: finding.recommendation_reason || null,
+      is_uncertain: Boolean(finding.is_uncertain),
+      uncertainty_reason: finding.uncertainty_reason || null,
+      start: finding.start,
+      end: finding.end,
     };
   });
 
@@ -235,6 +247,10 @@ export async function scanPayload({ text, task, privacy_mode, strictness = 'gdpr
     strictness,
     privacyScore: data.privacy_score ?? computePrivacyScore(normalizedFindings),
     isLiveBackend: true,
+    verification: data.verification || null,
+    combination_risks: Array.isArray(data.combination_risks) ? data.combination_risks : [],
+    quasi_identifiers: Array.isArray(data.quasi_identifiers) ? data.quasi_identifiers : [],
+    engine_status: data.engine_status || null,
   };
 }
 

@@ -20,6 +20,11 @@ class Finding(BaseModel):
     explanation: str = Field(..., description="Human-readable explanation of why entity was flagged")
     is_ambiguous: bool = Field(False, description="Flagged true if contextual relevance requires human audit")
     ambiguity_reason: Optional[str] = Field(None, description="Explanation of ambiguity if flagged")
+    risk_reason: Optional[str] = Field(None, description="Explanation of why this risk severity level was assigned")
+    recommendation: Optional[str] = Field(None, description="Recommended minimization action: Remove, Generalize, Replace with Placeholder, or Retain for Context")
+    recommendation_reason: Optional[str] = Field(None, description="Contextual rationale for the recommended minimization action")
+    is_uncertain: bool = Field(False, description="Flagged true if detection confidence is borderline or context requires review")
+    uncertainty_reason: Optional[str] = Field(None, description="Detailed reason for uncertainty if flagged")
 
 
 class EngineStatus(BaseModel):
@@ -92,6 +97,8 @@ class ScanResponse(BaseModel):
     privacy_score: float = Field(..., ge=0.0, le=100.0, description="Estimated privacy preservation score (0-100)")
     engine_status: EngineStatus = Field(..., description="State of the detection engines during this scan")
     verification: VerificationResult = Field(..., description="Secondary verification audit results")
+    combination_risks: List[Dict[str, Any]] = Field(default_factory=list, description="Contextual re-identification combination risks")
+    quasi_identifiers: List[str] = Field(default_factory=list, description="Unique quasi-identifiers detected that could facilitate linkage")
 
 
 class HealthResponse(BaseModel):

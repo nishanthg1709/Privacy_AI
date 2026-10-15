@@ -3,7 +3,7 @@ import { useAuth } from '../context/useAuth';
 
 /**
  * ProtectedRoute Component
- * Guards workspace routes. If user is not authenticated in the demo flow,
+ * Guards workspace routes. If user is not authenticated,
  * redirects to the Login page while preserving target path.
  */
 export default function ProtectedRoute({ children }) {

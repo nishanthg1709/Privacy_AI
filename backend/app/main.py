@@ -36,8 +36,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("privacy_guard.main")
 
-# Configuration parameters
-CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 CORS_ORIGINS = [orig.strip() for orig in CORS_ORIGINS_RAW.split(",") if orig.strip()]
 AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "urchade/gliner_small-v2.1")
 AI_DEVICE = os.getenv("AI_DEVICE", "cpu")

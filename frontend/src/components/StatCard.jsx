@@ -12,7 +12,7 @@ export default function StatCard({
   trendUp = true,
   icon: Icon,
   subtitle,
-  isDemo = true,
+  tag,
   onClick,
 }) {
   return (
@@ -36,7 +36,7 @@ export default function StatCard({
       <div className="pg-stat-header">
         <div className="pg-stat-title-group">
           <span className="pg-stat-title">{title}</span>
-          {isDemo && <span className="pg-stat-demo-pill">DEMO</span>}
+          {tag && <span className="pg-stat-tag-pill">{tag}</span>}
         </div>
         {Icon && (
           <div className="pg-stat-icon-wrap" aria-hidden="true">
