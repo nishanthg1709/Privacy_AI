@@ -303,6 +303,82 @@ class TestUnitModelLoadingFailuresAndDegradedState:
         assert detector.status == "error"
         assert "Simulated CUDA/Torch crash" in detector.load_error
 
+    def test_memory_error_during_gliner_loading_caught_gracefully(self):
+        """When GLiNER raises MemoryError (e.g. 512MB RAM cap), it catches safely and enters degraded mode."""
+        detector = AIDetectorService()
+        with patch("gliner.GLiNER.from_pretrained", side_effect=MemoryError("Out of memory on 512MB instance")):
+            with patch("presidio_analyzer.AnalyzerEngine"):
+                detector.load_engines(model_name="urchade/gliner_small-v2.1", enable_presidio=True)
+
+        assert detector.model_loaded is False
+        assert detector.presidio_loaded is True
+        assert detector.status == "degraded"
+        assert "Out of memory" in detector.load_error
+
+    def test_repeated_initialization_does_not_duplicate_instances(self):
+        """Repeated calls to load_engines do not reload or duplicate memory allocations."""
+        detector = AIDetectorService()
+        detector.model_loaded = True
+        detector.gliner_model = MagicMock()
+        detector.presidio_loaded = True
+        detector.presidio_analyzer = MagicMock()
+        detector.status = "ready"
+
+        initial_count = detector._load_count
+        with patch("gliner.GLiNER.from_pretrained") as mock_gliner:
+            detector.load_engines(enable_presidio=True, enable_gliner=True)
+            mock_gliner.assert_not_called()
+        assert detector._load_count == initial_count
+
+    def test_gliner_disabled_via_flag_switches_to_honest_degraded(self):
+        """Disabling GLiNER via enable_gliner=False cleanly runs in degraded mode without loading weights."""
+        detector = AIDetectorService()
+        with patch("presidio_analyzer.AnalyzerEngine"):
+            detector.load_engines(enable_gliner=False, enable_presidio=True)
+
+        assert detector.model_loaded is False
+        assert detector.presidio_loaded is True
+        assert detector.status == "degraded"
+        assert "disabled via configuration" in detector.load_error.lower()
+
+    def test_health_endpoint_separates_liveness_from_engine_readiness(self, client):
+        """Health check reports status='ok' (server responsive) but engine_ready=False when degraded."""
+        from app.services.ai_detector import detector_service
+
+        orig_status = detector_service.status
+        try:
+            # Degraded status: engine is not fully ready
+            detector_service.status = "degraded"
+            res = client.get("/api/health")
+            assert res.status_code == 200
+            assert res.json()["status"] == "ok"
+            assert res.json()["engine_ready"] is False
+
+            # Ready status: engine is fully loaded
+            detector_service.status = "ready"
+            res = client.get("/api/health")
+            assert res.status_code == 200
+            assert res.json()["status"] == "ok"
+            assert res.json()["engine_ready"] is True
+        finally:
+            detector_service.status = orig_status
+
+    def test_scan_behavior_when_ai_model_is_unavailable(self, isolated_engine, mock_detector):
+        """When GLiNER is unavailable (degraded state), scan uses Presidio + secrets and flags degraded status."""
+        mock_detector.model_loaded = False
+        mock_detector.presidio_loaded = True
+        mock_detector.status = "degraded"
+        mock_detector.load_error = "Model unavailable due to 512MB RAM cap"
+
+        text = "Contact Sarah Connor at sarah@cyberdyne.org. Key is sk-live_99887766554433221100aabb."
+        response = isolated_engine.process_scan(text=text, privacy_mode="strict")
+
+        assert response.engine_status.status == "degraded"
+        assert response.engine_status.model_loaded is False
+        assert response.engine_status.inference_backend == "presidio_hybrid"
+        # Deterministic secret was detected
+        assert any(f.type == "API_KEY" or "KEY" in f.type for f in response.findings)
+
     def test_engine_status_reflects_actual_state(self, client):
         """GET /api/engine-status endpoint accurately reports model state."""
         res = client.get("/api/engine-status")

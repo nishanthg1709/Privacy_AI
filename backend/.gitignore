@@ -52,3 +52,6 @@ htmlcov/
 models/
 .cache/
 hf_cache/
+
+# Local backup directory
+.manual_fix_backups/

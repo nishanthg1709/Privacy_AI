@@ -42,6 +42,7 @@ AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "urchade/gliner_small-v2.1")
 AI_DEVICE = os.getenv("AI_DEVICE", "cpu")
 AI_CONFIDENCE_THRESHOLD = float(os.getenv("AI_CONFIDENCE_THRESHOLD", "0.40"))
 ENABLE_PRESIDIO = os.getenv("ENABLE_PRESIDIO", "true").lower() in ("true", "1", "yes")
+ENABLE_GLINER = os.getenv("ENABLE_GLINER", "true").lower() in ("true", "1", "yes")
 MAX_PAYLOAD_CHARS = int(os.getenv("MAX_PAYLOAD_CHARS", "100000"))
 
 
@@ -56,6 +57,7 @@ async def lifespan(app: FastAPI):
             device=AI_DEVICE,
             confidence_threshold=AI_CONFIDENCE_THRESHOLD,
             enable_presidio=ENABLE_PRESIDIO,
+            enable_gliner=ENABLE_GLINER,
         )
         logger.info(
             "Engine initialization complete: model_loaded=%s, presidio_loaded=%s, status=%s",
@@ -152,12 +154,16 @@ async def root_endpoint() -> Dict[str, Any]:
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 @app.get("/api/health", response_model=HealthResponse, tags=["Health"])
 async def health_check() -> HealthResponse:
-    """Return backend server and engine health status."""
+    """Return backend server liveness and engine readiness.
+
+    Liveness status is always 'ok' while the FastAPI process is responsive.
+    engine_ready is strictly True only when the AI model is resident and ready.
+    """
     return HealthResponse(
         status="ok",
         service="PrivacyGuard AI Backend",
         version="1.0.0",
-        engine_ready=(detector_service.status in ("ready", "degraded")),
+        engine_ready=(detector_service.status == "ready"),
     )
 
 
@@ -219,6 +225,6 @@ if __name__ == "__main__":
     import uvicorn
 
     host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "7860"))
+    port = int(os.getenv("PORT", "8000"))
     logger.info("Starting PrivacyGuard AI on %s:%d", host, port)
-    uvicorn.run("app.main:app", host=host, port=port, reload=False)
+    uvicorn.run("app.main:app", host=host, port=port, reload=False, workers=1)

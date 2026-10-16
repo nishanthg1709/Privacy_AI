@@ -8,6 +8,8 @@ Combines:
 Loads models once during startup and never substitutes regex-only silently.
 """
 
+import os
+import gc
 import logging
 import re
 from typing import List, Dict, Any, Optional, Tuple
@@ -145,6 +147,8 @@ class AIDetectorService:
         self.presidio_loaded = False
         self.load_error: Optional[str] = None
         self.status = "uninitialized"  # "ready" | "degraded" | "error"
+        self._is_loading = False
+        self._load_count = 0
 
         # Supported target entity labels passed to contextual model
         self.target_labels = [
@@ -173,42 +177,94 @@ class AIDetectorService:
         device: str = "cpu",
         confidence_threshold: float = 0.40,
         enable_presidio: bool = True,
+        enable_gliner: bool = True,
     ) -> None:
-        """Load pretrained contextual model and Presidio framework once on startup."""
+        """Load pretrained contextual model and Presidio framework once on startup.
+
+        Memory Safeguards for Restricted Environments (e.g. Render 512MB RAM):
+        1. Configures single-threaded execution for PyTorch to prevent thread-pool memory explosion.
+        2. Guards against duplicate or concurrent model loading calls.
+        3. Releases temporary buffers with gc.collect().
+        4. Catches MemoryError and model exceptions gracefully, switching to honest 'degraded' status.
+        """
+        # Guard against concurrent or repeated loading
+        if self._is_loading:
+            logger.warning("Engine initialization is already in progress; skipping concurrent invocation.")
+            return
+
+        if self.model_loaded and self.gliner_model is not None:
+            if not enable_presidio or self.presidio_loaded:
+                logger.info("Engines already loaded; skipping redundant initialization.")
+                return
+
+        self._is_loading = True
+        self._load_count += 1
         self.model_name = model_name
         self.device = device
         self.confidence_threshold = confidence_threshold
 
-        # 1. Load GLiNER contextual model
-        try:
-            logger.info("Loading GLiNER contextual model '%s' onto device '%s'...", model_name, device)
-            from gliner import GLiNER
+        # 0. Limit PyTorch CPU threads & tokenizers parallelism before loading
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
+        os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-            self.gliner_model = GLiNER.from_pretrained(model_name)
-            self.model_loaded = True
-            logger.info("GLiNER model loaded successfully.")
-        except Exception as e:
+        try:
+            import torch
+            torch.set_num_threads(1)
+            try:
+                torch.set_num_interop_threads(1)
+            except RuntimeError:
+                pass  # Can only be set before parallel operations execute
+        except Exception as te:
+            logger.debug("PyTorch thread configuration note: %s", te)
+
+        # 1. Load GLiNER contextual model
+        if enable_gliner:
+            try:
+                logger.info("Loading GLiNER contextual model '%s' onto device '%s'...", model_name, device)
+                from gliner import GLiNER
+
+                self.gliner_model = GLiNER.from_pretrained(model_name)
+                if hasattr(self.gliner_model, "eval"):
+                    self.gliner_model.eval()
+                self.model_loaded = True
+                logger.info("GLiNER model loaded successfully.")
+            except (MemoryError, Exception) as e:
+                self.model_loaded = False
+                self.gliner_model = None
+                self.load_error = f"Failed to load GLiNER model: {str(e)}"
+                logger.error(self.load_error)
+            finally:
+                gc.collect()
+        else:
+            logger.info("GLiNER contextual model disabled by configuration (ENABLE_GLINER=false).")
             self.model_loaded = False
-            self.load_error = f"Failed to load GLiNER model: {str(e)}"
-            logger.error(self.load_error)
+            self.gliner_model = None
+            if not self.load_error:
+                self.load_error = "GLiNER contextual model disabled via configuration."
 
         # 2. Load Microsoft Presidio recognizer
         if enable_presidio:
-            try:
-                logger.info("Initializing Microsoft Presidio AnalyzerEngine...")
-                from presidio_analyzer import AnalyzerEngine
+            if not self.presidio_loaded or self.presidio_analyzer is None:
+                try:
+                    logger.info("Initializing Microsoft Presidio AnalyzerEngine...")
+                    from presidio_analyzer import AnalyzerEngine
 
-                self.presidio_analyzer = AnalyzerEngine()
-                self.presidio_loaded = True
-                logger.info("Presidio AnalyzerEngine initialized successfully.")
-            except Exception as pe:
-                self.presidio_loaded = False
-                presidio_err = f"Failed to initialize Presidio: {str(pe)}"
-                logger.warning(presidio_err)
-                if not self.load_error:
-                    self.load_error = presidio_err
-                else:
-                    self.load_error += f" | {presidio_err}"
+                    self.presidio_analyzer = AnalyzerEngine()
+                    self.presidio_loaded = True
+                    logger.info("Presidio AnalyzerEngine initialized successfully.")
+                except (MemoryError, Exception) as pe:
+                    self.presidio_loaded = False
+                    self.presidio_analyzer = None
+                    presidio_err = f"Failed to initialize Presidio: {str(pe)}"
+                    logger.warning(presidio_err)
+                    if not self.load_error:
+                        self.load_error = presidio_err
+                    else:
+                        self.load_error += f" | {presidio_err}"
+                finally:
+                    gc.collect()
 
         # 3. Determine overall status
         if self.model_loaded:
@@ -218,6 +274,9 @@ class AIDetectorService:
             self.status = "degraded"
         else:
             self.status = "error"
+
+        self._is_loading = False
+        gc.collect()
 
     def get_supported_categories(self) -> List[str]:
         """Return distinct supported high-level entity categories."""
@@ -231,15 +290,19 @@ class AIDetectorService:
             return []
 
         try:
-            predictions = self.gliner_model.predict_entities(
-                text,
-                self.target_labels,
-                flat_ner=True,
-                threshold=self.confidence_threshold,
-            )
+            import torch
+            with torch.inference_mode():
+                predictions = self.gliner_model.predict_entities(
+                    text,
+                    self.target_labels,
+                    flat_ner=True,
+                    threshold=self.confidence_threshold,
+                )
         except Exception as e:
             logger.error("GLiNER inference error: %s", str(e))
             return []
+        finally:
+            gc.collect()
 
         results: List[RawDetection] = []
         for p in predictions:

@@ -9,7 +9,7 @@ FROM python:3.11-slim
 # Prevent Python from writing .pyc files and enable unbuffered logging
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=7860 \
+    PORT=8000 \
     HOST=0.0.0.0 \
     HOME=/home/user
 
@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Hugging Face Spaces requires running as a non-root user with UID 1000
+# Non-root user with UID 1000
 RUN useradd -m -u 1000 user
 WORKDIR $HOME/app
 
@@ -38,12 +38,12 @@ COPY --chown=user:user . .
 # Switch to non-root user
 USER user
 
-# Expose container port
-EXPOSE 7860
+# Expose default ports (8000 for standard/Render, 7860 for Hugging Face)
+EXPOSE 8000 7860
 
-# Health check endpoint
+# Health check endpoint dynamically using $PORT
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:7860/api/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Launch Uvicorn with single resident worker to prevent redundant model memory duplication
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Launch Uvicorn dynamically bound to $PORT with 1 worker to prevent memory duplication
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
