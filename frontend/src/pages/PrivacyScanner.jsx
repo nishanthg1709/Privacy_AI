@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ShieldCheck,
@@ -9,13 +9,12 @@ import {
   CheckCircle2,
   Lock,
   ArrowRight,
-  Server,
   AlertTriangle,
   Cpu,
   Layers
 } from 'lucide-react';
 import Button from '../components/Button';
-import scannerService, { checkBackendHealth } from '../services/scannerService';
+import scannerService from '../services/scannerService';
 
 /**
  * Editorial PrivacyScanner Page Component
@@ -54,57 +53,6 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
   const [scanError, setScanError] = useState(null);
   const [scanResultNotice, setScanResultNotice] = useState(null);
   const [dragActive, setDragActive] = useState(false);
-
-  // Backend health status
-  const [backendStatus, setBackendStatus] = useState({
-    isOnline: false,
-    checking: true,
-    url: scannerService.getBaseUrl(),
-  });
-
-  const checkConnectivity = useCallback(async () => {
-    setBackendStatus((prev) => ({ ...prev, checking: true }));
-    try {
-      const health = await checkBackendHealth();
-      setBackendStatus({
-        isOnline: health.isOnline,
-        checking: false,
-        url: health.url,
-      });
-    } catch {
-      setBackendStatus((prev) => ({
-        ...prev,
-        isOnline: false,
-        checking: false,
-      }));
-    }
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    checkBackendHealth()
-      .then((health) => {
-        if (active) {
-          setBackendStatus({
-            isOnline: health.isOnline,
-            checking: false,
-            url: health.url,
-          });
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setBackendStatus((prev) => ({
-            ...prev,
-            isOnline: false,
-            checking: false,
-          }));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   // Animate progress steps during active real scanning
   useEffect(() => {
@@ -236,7 +184,7 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
       setIsScanning(false);
       setScanError(
         err.message ||
-        `Unable to connect to PrivacyGuard AI backend at ${backendStatus.url}. Please ensure the backend is running.`
+        'Unable to connect to the PrivacyGuard AI backend. Please verify that the backend service is running and accessible.'
       );
     }
   };
@@ -260,33 +208,6 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
           <p className="pg-workspace-page-subtitle">
             Configure task context, select minimization rules, and detect sensitive entities in-memory.
           </p>
-        </div>
-
-        <div className="pg-header-action-group">
-          {/* Backend Health Badge */}
-          <div
-            className={`pg-backend-status-badge ${backendStatus.isOnline ? 'pg-backend-online' : 'pg-backend-offline'
-              }`}
-            title={`Configured endpoint: ${backendStatus.url}/api/scan`}
-          >
-            <span className="pg-status-dot"></span>
-            <span className="pg-status-text">
-              {backendStatus.checking
-                ? 'Checking backend...'
-                : backendStatus.isOnline
-                  ? `Engine Ready (${backendStatus.url})`
-                  : `Engine Offline (${backendStatus.url})`}
-            </span>
-            <button
-              type="button"
-              className="pg-status-refresh-btn"
-              onClick={checkConnectivity}
-              title="Test backend connection"
-              aria-label="Test backend connection"
-            >
-              <RefreshCw size={12} className={backendStatus.checking ? 'pg-spin' : ''} />
-            </button>
-          </div>
         </div>
       </div>
 
@@ -523,15 +444,6 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
                     onClick={handleAnalyzeAndProtect}
                   >
                     Retry Scan
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    icon={Server}
-                    onClick={checkConnectivity}
-                  >
-                    Test Server
                   </Button>
                 </div>
               </div>

@@ -10,8 +10,7 @@ import {
   Settings,
   ChevronRight,
   Terminal,
-  FileText,
-  Sparkles
+  FileText
 } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import Button from '../components/Button';
@@ -333,19 +332,6 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
             </div>
           </div>
         )}
-      </section>
-
-      {/* Architecture Transparency Note */}
-      <section className="pg-workspace-status-callout pg-anim-dashboard-note" role="note">
-        <div className="pg-status-callout-header">
-          <Sparkles size={14} className="pg-text-cream" />
-          <strong>Local Neural Inference &amp; Zero-Log Storage</strong>
-        </div>
-        <p>
-          PrivacyGuard AI processes prompts entirely in-memory using local GLiNER and Microsoft Presidio models.
-          Raw source text and detected entity values are never written to disk, sent to external cloud APIs,
-          or persisted in database records.
-        </p>
       </section>
     </div>
   );

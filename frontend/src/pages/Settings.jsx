@@ -467,7 +467,7 @@ export default function Settings({ settings, onSaveSettings }) {
                 1. Local AI Execution (FastAPI + GLiNER + Presidio)
               </strong>
               <span>
-                All document content, prompts, and raw text are processed strictly within your local machine (http://localhost:8000). Your documents are never transmitted to external third-party AI APIs or remote LLMs.
+                All document content, prompts, and raw text are processed strictly within your local environment. Your documents are never transmitted to external third-party AI APIs or remote LLMs.
               </span>
             </div>
 

@@ -2051,21 +2051,7 @@
   flex-wrap: wrap;
 }
 
-.pg-workspace-status-callout,
-.pg-workspace-demo-callout {
-  padding: 12px 16px;
-  border-radius: var(--pg-radius-xs);
-  background: var(--pg-bg-elevated);
-  border: 1px solid var(--pg-border-hairline);
-  font-size: 0.8rem;
-  color: var(--pg-cream-300);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.pg-status-callout-header,
-.pg-demo-callout-header {
+.pg-status-callout-header {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3640,83 +3626,8 @@
 }
 
 /* ==========================================================================
-   Backend Status, Error Retry Card & Empty States
+   Error Retry Card & Empty States
    ========================================================================== */
-
-.pg-backend-status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: var(--pg-radius-full);
-  font-size: 0.75rem;
-  font-weight: 500;
-  border: 1px solid var(--pg-border-hairline);
-  background: var(--pg-bg-surface);
-  transition: all var(--pg-transition-snappy);
-}
-
-.pg-backend-online {
-  border-color: rgba(74, 222, 128, 0.3);
-  color: var(--pg-mint);
-}
-
-.pg-backend-online .pg-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--pg-mint);
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
-}
-
-.pg-backend-offline {
-  border-color: rgba(245, 158, 11, 0.3);
-  color: var(--pg-cream-300);
-}
-
-.pg-backend-offline .pg-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #f59e0b;
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
-}
-
-.pg-status-refresh-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--pg-cream-400);
-  cursor: pointer;
-  padding: 2px;
-  border-radius: var(--pg-radius-xs);
-  transition: color var(--pg-transition-snappy);
-}
-
-.pg-status-refresh-btn:hover {
-  color: var(--pg-cream-100);
-}
-
-.pg-spin {
-  animation: pgSpin 1s linear infinite;
-}
-
-@keyframes pgSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.pg-pulse-green {
-  background: var(--pg-mint) !important;
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6) !important;
-}
-
-.pg-pulse-amber {
-  background: #f59e0b !important;
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5) !important;
-}
 
 /* Error Retry Card */
 .pg-error-retry-card {
@@ -5233,10 +5144,6 @@
   animation: heroFadeInUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.40s both;
 }
 
-.pg-anim-dashboard-note {
-  animation: heroFadeInUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.48s both;
-}
-
 /* Topbar Search & Notification */
 .pg-topbar-search-form {
   position: relative;
@@ -6443,8 +6350,7 @@
   .pg-workspace-hero-panel,
   .pg-action-card,
   .pg-anim-dashboard-telemetry,
-  .pg-anim-dashboard-activity,
-  .pg-anim-dashboard-note {
+  .pg-anim-dashboard-activity {
     animation: none !important;
     transform: none !important;
   }

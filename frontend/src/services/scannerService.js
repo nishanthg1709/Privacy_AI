@@ -104,7 +104,7 @@ export async function scanPayload({ text, task, privacy_mode, strictness = 'gdpr
     }
     // Network failure / Connection refused
     throw new Error(
-      `Unable to connect to PrivacyGuard AI backend at ${baseUrl}. Please ensure the backend server is running on port 8000 and accessible.`,
+      'Unable to connect to the PrivacyGuard AI backend. Please verify that the backend service is running and accessible.',
       { cause: err }
     );
   }
