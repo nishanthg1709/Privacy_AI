@@ -11,7 +11,7 @@
  * - Token management is handled securely by @supabase/supabase-js.
  */
 
-import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { supabase, isSupabaseConfigured } from './supabaseClient.js';
 
 const LEGACY_STORAGE_KEY = 'pg_auth_session';
 const LEGACY_USERS_STORE_KEY = 'pg_registered_users';
@@ -285,13 +285,14 @@ class AuthService {
       email: sbUser.email,
       name: displayName,
       displayName,
-      organization: meta.organization || 'Enterprise Workspace',
-      role: meta.role || 'Privacy Administrator',
+      organization: profileData?.organization || meta.organization || 'Enterprise Workspace',
+      role: profileData?.role || meta.role || 'Privacy Administrator',
       joinedDate: (profileData?.created_at || sbUser.created_at)
         ? (profileData?.created_at || sbUser.created_at).split('T')[0]
         : new Date().toISOString().split('T')[0],
       updatedAt: profileData?.updated_at || sbUser.updated_at || null,
       emailConfirmationPending,
+      isAnonymous: Boolean(sbUser.is_anonymous),
     };
   }
 }

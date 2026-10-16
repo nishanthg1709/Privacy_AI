@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ShieldCheck,
@@ -11,10 +11,13 @@ import {
   ArrowRight,
   AlertTriangle,
   Cpu,
-  Layers
+  Layers,
+  X,
+  FileCheck
 } from 'lucide-react';
 import Button from '../components/Button';
 import scannerService from '../services/scannerService';
+import { formatFileSize, validateFile, inspectDecodedText } from '../utils/fileValidation';
 
 /**
  * Editorial PrivacyScanner Page Component
@@ -54,6 +57,12 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
   const [scanResultNotice, setScanResultNotice] = useState(null);
   const [dragActive, setDragActive] = useState(false);
 
+  // Staged file state and accessible file input ref
+  const fileInputRef = useRef(null);
+  const dragCounterRef = useRef(0);
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [isReadingFile, setIsReadingFile] = useState(false);
+
   // Animate progress steps during active real scanning
   useEffect(() => {
     let t1, t2;
@@ -76,6 +85,10 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
   };
 
   const handleLoadPreset = (key) => {
+    setUploadedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     setContent(samplePresets[key]);
     if (key === 'general') {
       setTaskName('General Document Sharing');
@@ -96,8 +109,23 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
 
   const handleClear = () => {
     setContent('');
+    setUploadedFile(null);
     setScanResultNotice(null);
     setScanError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleClearFile = () => {
+    setUploadedFile(null);
+    setContent('');
+    setTaskName('General Document Sharing');
+    setScanResultNotice(null);
+    setScanError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   // Drag and drop or file upload handler
@@ -106,47 +134,112 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
     if (file) {
       readFile(file);
     }
+    if (e.target) {
+      e.target.value = '';
+    }
+  };
+
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer?.items && e.dataTransfer.items.length > 0) {
+      setDragActive(true);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dragActive) {
+      setDragActive(true);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setDragActive(false);
+    }
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      readFile(e.dataTransfer.files[0]);
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      readFile(files[0]);
     }
   };
 
   const readFile = (file) => {
-    const maxSizeBytes = 500 * 1024; // 500 KB limit
-    if (file.size > maxSizeBytes) {
-      setScanError(`File exceeds maximum size limit (500 KB). Uploaded file is ${(file.size / 1024).toFixed(1)} KB.`);
+    if (!file) return;
+
+    setScanError(null);
+    setScanResultNotice(null);
+
+    const validation = validateFile(file);
+    if (!validation.isValid) {
+      setScanError(validation.error);
       return;
     }
 
-    const allowedExtensions = ['.txt', '.md', '.json', '.csv', '.log'];
-    const fileNameLower = file.name.toLowerCase();
-    const isAllowed = allowedExtensions.some((ext) => fileNameLower.endsWith(ext));
-
-    if (!isAllowed) {
-      setScanError(`Unsupported file type. PrivacyGuard AI accepts plain-text documents (${allowedExtensions.join(', ')}).`);
-      return;
-    }
+    setIsReadingFile(true);
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      setContent(event.target.result);
+      setIsReadingFile(false);
+      const text = event.target?.result;
+
+      const inspection = inspectDecodedText(text, file.name);
+      if (!inspection.isValid) {
+        setScanError(inspection.error);
+        return;
+      }
+
+      setUploadedFile({
+        name: file.name,
+        size: file.size,
+        formattedSize: formatFileSize(file.size),
+        lineCount: inspection.lineCount,
+        charCount: inspection.charCount,
+        preview: inspection.preview,
+        isTruncated: inspection.isTruncated,
+      });
+
+      setContent(text);
       setTaskName(`Uploaded File: ${file.name}`);
       setScanError(null);
     };
+
     reader.onerror = () => {
-      setScanError('Failed to read the file.');
+      setIsReadingFile(false);
+      setScanError(`Failed to read "${file.name}". Please ensure the file is readable and try again.`);
     };
-    reader.readAsText(file);
+
+    reader.onabort = () => {
+      setIsReadingFile(false);
+      setScanError(`File reading was cancelled.`);
+    };
+
+    try {
+      reader.readAsText(file, 'UTF-8');
+    } catch (err) {
+      setIsReadingFile(false);
+      setScanError(`Error reading file: ${err.message || 'Unknown error'}`);
+    }
   };
 
   // Real backend submission
   const handleAnalyzeAndProtect = async (e) => {
     if (e) e.preventDefault();
+    if (isScanning || isReadingFile) return;
+
     if (!content.trim()) {
       setScanError('Please provide document text or upload a supported file.');
       return;
@@ -357,32 +450,122 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
                   required
                 />
               </div>
-            ) : (
-              <div
-                className={`pg-dropzone ${dragActive ? 'pg-dropzone-active' : ''}`}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragActive(true);
-                }}
-                onDragLeave={() => setDragActive(false)}
-                onDrop={handleDrop}
-              >
-                <Upload size={22} className="pg-drop-icon" />
-                <div className="pg-drop-text">
-                  <span>Drag &amp; drop document or </span>
-                  <label className="pg-drop-browse">
-                    <span>browse files</span>
-                    <input
-                      type="file"
-                      className="pg-sr-only"
-                      accept=".txt,.json,.csv,.log"
-                      onChange={handleFileUpload}
-                    />
-                  </label>
+            ) : uploadedFile ? (
+              /* STAGED UPLOADED FILE CARD */
+              <div className="pg-uploaded-file-card" role="region" aria-label="Selected file details">
+                <div className="pg-uploaded-file-header">
+                  <div className="pg-uploaded-file-info">
+                    <div className="pg-uploaded-file-icon-wrap">
+                      <FileCheck size={20} className="pg-text-cream" />
+                    </div>
+                    <div className="pg-uploaded-file-meta">
+                      <span className="pg-uploaded-filename" title={uploadedFile.name}>
+                        {uploadedFile.name}
+                      </span>
+                      <div className="pg-uploaded-file-tags">
+                        <span className="pg-file-tag">{uploadedFile.formattedSize}</span>
+                        <span className="pg-file-tag">{uploadedFile.lineCount} lines</span>
+                        <span className="pg-file-tag">{uploadedFile.charCount} characters</span>
+                        <span className="pg-file-tag pg-file-tag-ready">
+                          <CheckCircle2 size={11} /> Ready to Scan
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pg-uploaded-file-actions">
+                    <button
+                      type="button"
+                      className="pg-file-action-btn"
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Choose a different file to replace this one"
+                      disabled={isScanning || isReadingFile}
+                    >
+                      <RefreshCw size={12} />
+                      <span>Replace</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="pg-file-action-btn pg-file-action-clear"
+                      onClick={handleClearFile}
+                      title="Remove selected file"
+                      disabled={isScanning || isReadingFile}
+                    >
+                      <X size={12} />
+                      <span>Clear</span>
+                    </button>
+                  </div>
                 </div>
-                <span className="pg-drop-formats">Supports plain-text .txt, .json, .csv, and .log files</span>
+
+                {/* Content snippet preview */}
+                <div className="pg-uploaded-file-preview-wrap">
+                  <div className="pg-preview-header">
+                    <span className="pg-preview-label">Document Content Preview</span>
+                    <span className="pg-preview-badge">UTF-8 Verified</span>
+                  </div>
+                  <pre className="pg-file-preview-content">
+                    {uploadedFile.preview}
+                    {uploadedFile.isTruncated && '\n... [Remaining content loaded and ready for scanning]'}
+                  </pre>
+                </div>
+              </div>
+            ) : (
+              /* INTERACTIVE ACCESSIBLE DROPZONE */
+              <div
+                className={`pg-dropzone ${dragActive ? 'pg-dropzone-active' : ''} ${isReadingFile ? 'pg-dropzone-loading' : ''}`}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                tabIndex={0}
+                role="button"
+                aria-label="Upload document by clicking or dropping a file here"
+              >
+                {isReadingFile ? (
+                  <div className="pg-drop-loading-state">
+                    <RefreshCw size={24} className="pg-spin pg-text-cream" />
+                    <span className="pg-drop-text">Reading document...</span>
+                  </div>
+                ) : (
+                  <>
+                    <Upload size={24} className="pg-drop-icon" />
+                    <div className="pg-drop-text">
+                      <span>Drag &amp; drop document or </span>
+                      <button
+                        type="button"
+                        className="pg-drop-browse-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          fileInputRef.current?.click();
+                        }}
+                      >
+                        browse files
+                      </button>
+                    </div>
+                    <span className="pg-drop-formats">
+                      Supports plain-text .txt, .json, .csv, and .log files (max 500 KB)
+                    </span>
+                  </>
+                )}
               </div>
             )}
+
+            {/* Hidden native file input accessible from anywhere */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="pg-sr-only"
+              accept=".txt,.json,.csv,.log,.md,text/plain,text/csv,application/json"
+              onChange={handleFileUpload}
+              tabIndex={-1}
+              aria-hidden="true"
+            />
 
             {/* Quick Sample Preset Buttons */}
             <div className="pg-scanner-presets-row">

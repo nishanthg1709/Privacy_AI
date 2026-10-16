@@ -10,10 +10,17 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+const rawUrl = (
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) ||
+  (typeof globalThis !== 'undefined' && globalThis.process?.env?.VITE_SUPABASE_URL) ||
+  ''
+).trim();
+
 const rawKey = (
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  (typeof import.meta !== 'undefined' &&
+    (import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env?.VITE_SUPABASE_ANON_KEY)) ||
+  (typeof globalThis !== 'undefined' &&
+    (globalThis.process?.env?.VITE_SUPABASE_PUBLISHABLE_KEY || globalThis.process?.env?.VITE_SUPABASE_ANON_KEY)) ||
   ''
 ).trim();
 

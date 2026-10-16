@@ -278,10 +278,12 @@ export async function scanPayload({ text, task, privacy_mode, strictness = 'gdpr
   // Return comprehensive, normalized scan object
   return {
     scanId,
+    scan_id: scanId,
     timestamp,
     taskName: task || 'Prompt Privacy Audit',
     originalText: text,
     protectedText,
+    protected_text: protectedText,
     sanitizedText: protectedText,
     findings: normalizedFindings,
     categories,
