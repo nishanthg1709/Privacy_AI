@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle, CheckCircle2, User, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2, User, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
-import { getSupabaseConfigStatus } from '../services/supabaseClient';
 import Button from './Button';
 
 /**
@@ -24,8 +23,6 @@ export default function SignupForm() {
   const [termsModalOpen, setTermsModalOpen] = useState(false);
   const [confirmationNotice, setConfirmationNotice] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const configStatus = getSupabaseConfigStatus();
 
   // If already authenticated, redirect to workspace
   useEffect(() => {
@@ -135,22 +132,6 @@ export default function SignupForm() {
 
   return (
     <div className="pg-signup-form-root">
-      {/* Auth Banner */}
-      <div className="pg-auth-status-banner" role="status">
-        <div className="pg-auth-status-header">
-          <Sparkles size={14} className="pg-text-cream" />
-          <span>
-            {isCloudConfigured
-              ? 'Supabase Cloud Registration Active'
-              : 'Supabase Credentials Required'}
-          </span>
-        </div>
-        <p className="pg-auth-status-desc">
-          {isCloudConfigured
-            ? 'New accounts are registered directly in your Supabase Auth project.'
-            : `${configStatus.message} Please configure ${configStatus.missing?.length > 0 ? configStatus.missing.join(' and ') : 'VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY'} in frontend/.env to enable registration.`}
-        </p>
-      </div>
 
       {/* Confirmation Sent Banner */}
       {confirmationNotice && (

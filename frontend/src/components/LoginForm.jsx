@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle, CheckCircle2, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
-import { getSupabaseConfigStatus } from '../services/supabaseClient';
 import Button from './Button';
 
 /**
@@ -14,8 +13,6 @@ export default function LoginForm() {
   const { login, isAuthenticated, isLoading, isCloudConfigured } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const configStatus = getSupabaseConfigStatus();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -69,22 +66,6 @@ export default function LoginForm() {
 
   return (
     <div className="pg-login-form-root">
-      {/* Authentication Mode Status Banner */}
-      <div className="pg-auth-status-banner" role="status">
-        <div className="pg-auth-status-header">
-          <Sparkles size={14} className="pg-text-cream" />
-          <span>
-            {isCloudConfigured
-              ? 'Supabase Cloud Authentication Active'
-              : 'Supabase Credentials Required'}
-          </span>
-        </div>
-        <p className="pg-auth-status-desc">
-          {isCloudConfigured
-            ? 'Sign in with your registered Supabase credentials to access your workspace.'
-            : `${configStatus.message} Please configure ${configStatus.missing?.length > 0 ? configStatus.missing.join(' and ') : 'VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY'} in frontend/.env to enable authentication.`}
-        </p>
-      </div>
 
       {/* Error Message */}
       {error && (
