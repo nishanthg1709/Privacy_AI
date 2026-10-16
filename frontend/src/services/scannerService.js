@@ -7,49 +7,86 @@
  * - Sends JSON payload: { text, task, privacy_mode }
  * - Robust error handling (timeouts, network offline, HTTP errors, schema parsing)
  * - Strict zero-log policy for sensitive documents, detected entities, or tokens
+/**
+ * Detects whether the current environment is local development.
  */
+export const isLocalDevelopment = () => {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+    return true;
+  }
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';
+  }
+  return false;
+};
 
-const getBaseUrl = () => {
+/**
+ * Resolves the configured API base URL.
+ * Uses import.meta.env.VITE_API_BASE_URL as the primary source.
+ * Falls back to http://localhost:8000 strictly in local development.
+ */
+export const getBaseUrl = () => {
   const envUrl =
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) ||
     (typeof globalThis !== 'undefined' && globalThis.process?.env?.VITE_API_BASE_URL);
+
   if (envUrl && typeof envUrl === 'string' && envUrl.trim().length > 0) {
-    return envUrl.replace(/\/+$/, '');
+    return envUrl.trim().replace(/\/+$/, '');
   }
-  return 'http://localhost:8000';
+
+  // http://localhost:8000 is used strictly as a local-development fallback
+  if (isLocalDevelopment()) {
+    return 'http://localhost:8000';
+  }
+
+  // In production without configured VITE_API_BASE_URL, do not default to localhost
+  return '';
 };
 
 /**
  * Checks whether the backend endpoint is currently reachable.
- * Useful for non-intrusive UI status badges without logging sensitive payloads.
+ * Uses the configured API base URL without hardcoding localhost in production.
  */
 export async function checkBackendHealth() {
   const baseUrl = getBaseUrl();
+
+  // If in production and VITE_API_BASE_URL is not configured
+  if (!baseUrl && !isLocalDevelopment()) {
+    return {
+      isOnline: false,
+      status: 0,
+      url: '',
+      error: 'VITE_API_BASE_URL environment variable is not configured.',
+    };
+  }
+
+  const targetUrl = baseUrl || 'http://localhost:8000';
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3000);
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
 
   try {
-    const res = await fetch(`${baseUrl}/api/health`, {
+    const res = await fetch(`${targetUrl}/api/health`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-    return { isOnline: res.ok, status: res.status, url: baseUrl };
+    return { isOnline: res.ok, status: res.status, url: targetUrl };
   } catch {
     clearTimeout(timeoutId);
     // Try fallback root check
     try {
       const fallbackCtrl = new AbortController();
       const fallbackTimeout = setTimeout(() => fallbackCtrl.abort(), 2000);
-      const rootRes = await fetch(`${baseUrl}/`, {
+      const rootRes = await fetch(`${targetUrl}/`, {
         method: 'GET',
         signal: fallbackCtrl.signal,
       });
       clearTimeout(fallbackTimeout);
-      return { isOnline: rootRes.ok, status: rootRes.status, url: baseUrl };
+      return { isOnline: rootRes.ok, status: rootRes.status, url: targetUrl };
     } catch {
-      return { isOnline: false, status: 0, url: baseUrl };
+      return { isOnline: false, status: 0, url: targetUrl };
     }
   }
 }
@@ -70,6 +107,13 @@ export async function scanPayload({ text, task, privacy_mode, strictness = 'gdpr
   }
 
   const baseUrl = getBaseUrl();
+
+  if (!baseUrl && !isLocalDevelopment()) {
+    throw new Error(
+      'PrivacyGuard AI backend URL is not configured. Please set the VITE_API_BASE_URL environment variable in your Vercel Project Settings to your deployed backend URL.'
+    );
+  }
+
   const endpoint = `${baseUrl}/api/scan`;
 
   const controller = new AbortController();
@@ -103,8 +147,9 @@ export async function scanPayload({ text, task, privacy_mode, strictness = 'gdpr
       );
     }
     // Network failure / Connection refused
+    const hostInfo = baseUrl ? ` at ${baseUrl}` : '';
     throw new Error(
-      'Unable to connect to the PrivacyGuard AI backend. Please verify that the backend service is running and accessible.',
+      `Unable to connect to PrivacyGuard AI backend${hostInfo}. Please verify the backend service is running and accessible.`,
       { cause: err }
     );
   }
@@ -308,6 +353,7 @@ const scannerService = {
   scanDocument,
   checkBackendHealth,
   getBaseUrl,
+  isLocalDevelopment,
 };
 
 export default scannerService;
