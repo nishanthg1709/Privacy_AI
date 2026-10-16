@@ -79,7 +79,6 @@ export default function Footer() {
             &copy; {currentYear} PrivacyGuard AI. All rights reserved. Built for sovereign AI governance.
           </div>
           <div className="pg-footer-notice">
-            <span className="pg-footer-status-pill">Local AI Engine Ready</span>
             <span>Document processing and entity detection run locally. Telemetry complies with zero-log privacy standards.</span>
           </div>
         </div>

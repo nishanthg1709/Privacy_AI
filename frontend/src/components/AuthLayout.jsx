@@ -85,12 +85,16 @@ export default function AuthLayout({
       </div>
 
       {/* Right Column: Monumental Gateway Artwork (Matching Reference Panel 3) */}
-      <div className="pg-auth-split-visual-panel" aria-hidden="true">
-        <img
-          src={gatewayImg}
-          alt="Monochrome security gateway with glowing pathway"
-          className="pg-auth-gateway-img"
-        />
+      <div
+        className="pg-auth-split-visual-panel"
+        style={{
+          backgroundImage: `url(${gatewayImg})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center center',
+          backgroundRepeat: 'no-repeat',
+        }}
+        aria-hidden="true"
+      >
         <div className="pg-auth-split-visual-overlay" />
       </div>
     </div>

@@ -57,6 +57,20 @@ function isServiceRoleKey(key) {
 }
 
 /**
+ * Identify specifically which Supabase credentials are missing or invalid
+ */
+export function getMissingSupabaseCredentials() {
+  const missing = [];
+  if (!rawUrl || isPlaceholder(rawUrl) || (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://'))) {
+    missing.push('VITE_SUPABASE_URL');
+  }
+  if (!rawKey || isPlaceholder(rawKey) || isServiceRoleKey(rawKey)) {
+    missing.push('VITE_SUPABASE_PUBLISHABLE_KEY');
+  }
+  return missing;
+}
+
+/**
  * Returns true if valid Supabase URL and Publishable/Anon keys are configured
  */
 export function isSupabaseConfigured() {
@@ -84,15 +98,27 @@ export function getSupabaseConfigStatus() {
       configured: true,
       url: rawUrl,
       mode: 'live_cloud',
+      missing: [],
       message: 'Connected to Supabase Project (Auth & Row Level Security active)',
     };
+  }
+
+  const missing = getMissingSupabaseCredentials();
+  let message = 'Supabase credentials are not detected in frontend/.env.';
+  if (missing.length === 2) {
+    message = 'Missing VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in frontend/.env.';
+  } else if (missing.includes('VITE_SUPABASE_URL')) {
+    message = 'Missing or invalid VITE_SUPABASE_URL in frontend/.env.';
+  } else if (missing.includes('VITE_SUPABASE_PUBLISHABLE_KEY')) {
+    message = 'Missing or invalid VITE_SUPABASE_PUBLISHABLE_KEY in frontend/.env.';
   }
 
   return {
     configured: false,
     url: rawUrl || 'Unset',
+    missing,
     mode: 'local_session',
-    message: 'Supabase credentials not configured. Running in local session mode.',
+    message,
   };
 }
 

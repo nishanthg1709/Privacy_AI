@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle, CheckCircle2, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
+import { getSupabaseConfigStatus } from '../services/supabaseClient';
 import Button from './Button';
 
 /**
@@ -13,6 +14,8 @@ export default function LoginForm() {
   const { login, isAuthenticated, isLoading, isCloudConfigured } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const configStatus = getSupabaseConfigStatus();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,7 +78,7 @@ export default function LoginForm() {
         <p className="pg-auth-status-desc">
           {isCloudConfigured
             ? 'Sign in with your registered Supabase credentials to access your workspace.'
-            : 'Supabase credentials are not detected in frontend/.env. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to enable authentication.'}
+            : `${configStatus.message} Please configure ${configStatus.missing?.length > 0 ? configStatus.missing.join(' and ') : 'VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY'} in frontend/.env to enable authentication.`}
         </p>
       </div>
 
@@ -182,9 +185,10 @@ export default function LoginForm() {
           variant="primary"
           size="lg"
           isLoading={isLoading}
-          disabled={isLoading || !isCloudConfigured}
+          disabled={isLoading || !isCloudConfigured || !email.trim() || !password}
           iconAfter={ArrowRight}
           className="pg-w-full pg-auth-submit-btn"
+          id="login-submit-btn"
         >
           Log In
         </Button>

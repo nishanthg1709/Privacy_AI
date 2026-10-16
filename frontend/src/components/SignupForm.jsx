@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, Sparkles, AlertCircle, CheckCircle2, User, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
+import { getSupabaseConfigStatus } from '../services/supabaseClient';
 import Button from './Button';
 
 /**
@@ -22,6 +23,9 @@ export default function SignupForm() {
   const [error, setError] = useState('');
   const [termsModalOpen, setTermsModalOpen] = useState(false);
   const [confirmationNotice, setConfirmationNotice] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const configStatus = getSupabaseConfigStatus();
 
   // If already authenticated, redirect to workspace
   useEffect(() => {
@@ -55,17 +59,42 @@ export default function SignupForm() {
 
   const strength = calculateStrength(password);
 
+  // Field validation checks
+  const isNameValid = name.trim().length > 0;
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const isPasswordValid = password.length >= 8;
+  const isConfirmPasswordValid = confirmPassword.length >= 8 && confirmPassword === password;
+  const isTermsValid = Boolean(agreeTerms);
+
+  // Overall form validity and button readiness
+  const isFormValid =
+    isNameValid &&
+    isEmailValid &&
+    isPasswordValid &&
+    isConfirmPasswordValid &&
+    isTermsValid &&
+    Boolean(isCloudConfigured);
+
+  const isSubmitDisabled = !isFormValid || isLoading || isSubmitting;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setConfirmationNotice(null);
+
+    if (!isCloudConfigured) {
+      setError(
+        'Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to frontend/.env.'
+      );
+      return;
+    }
 
     if (!name.trim()) {
       setError('Please provide your full name.');
       return;
     }
 
-    if (!email.trim() || !email.includes('@')) {
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setError('Please provide a valid work email address.');
       return;
     }
@@ -85,24 +114,22 @@ export default function SignupForm() {
       return;
     }
 
-    if (!isCloudConfigured) {
-      setError(
-        'Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to frontend/.env.'
-      );
-      return;
-    }
-
+    setIsSubmitting(true);
     try {
-      const newUser = await signup({ name, email, password });
+      const newUser = await signup({ name: name.trim(), email: email.trim(), password });
       if (newUser?.emailConfirmationPending) {
         setConfirmationNotice(
-          `Account registered for ${email}. Please check your email inbox to verify your address before signing in.`
+          `Account registered for ${email.trim()}. A confirmation email has been sent. Please verify your email before signing in.`
         );
-      } else {
+        setPassword('');
+        setConfirmPassword('');
+      } else if (newUser?.id) {
         navigate('/app/dashboard');
       }
     } catch (err) {
       setError(err.message || 'Registration failed.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -121,7 +148,7 @@ export default function SignupForm() {
         <p className="pg-auth-status-desc">
           {isCloudConfigured
             ? 'New accounts are registered directly in your Supabase Auth project.'
-            : 'Supabase credentials are not detected in frontend/.env. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to enable registration.'}
+            : `${configStatus.message} Please configure ${configStatus.missing?.length > 0 ? configStatus.missing.join(' and ') : 'VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY'} in frontend/.env to enable registration.`}
         </p>
       </div>
 
@@ -259,6 +286,14 @@ export default function SignupForm() {
               required
             />
           </div>
+          {confirmPassword && password !== confirmPassword && (
+            <span
+              className="pg-field-hint"
+              style={{ color: 'var(--pg-cream-400)', marginTop: '4px', fontSize: '0.78rem' }}
+            >
+              Passwords do not match.
+            </span>
+          )}
         </div>
 
         {/* Terms & Conditions Checkbox */}
@@ -291,10 +326,11 @@ export default function SignupForm() {
           type="submit"
           variant="primary"
           size="lg"
-          isLoading={isLoading}
-          disabled={isLoading || !isCloudConfigured}
+          isLoading={isLoading || isSubmitting}
+          disabled={isSubmitDisabled}
           iconAfter={ArrowRight}
           className="pg-w-full pg-auth-submit-btn"
+          id="signup-create-account-btn"
         >
           Create Account
         </Button>
