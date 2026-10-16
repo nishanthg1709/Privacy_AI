@@ -16,6 +16,7 @@ import {
 import Sidebar from './Sidebar';
 import Button from './Button';
 import { useAuth } from '../context/useAuth';
+import planetHorizonImg from '../assets/planet-security-horizon.jpg';
 
 /**
  * Reusable Editorial WorkspaceLayout Component
@@ -81,6 +82,35 @@ export default function WorkspaceLayout({
 
       {/* Main Column Wrapper */}
       <div className="pg-workspace-main">
+        {/* Atmospheric Cinematic Workspace Background Stage */}
+        <div className="pg-workspace-bg-stage" aria-hidden="true">
+          {/* Layer 1: Ambient Radial Gradients (Slowly Moving Atmospheric Spotlights) */}
+          <div className="pg-workspace-ambient-light light-primary" />
+          <div className="pg-workspace-ambient-light light-secondary" />
+
+          {/* Layer 2: Animated Cybernetic Security Mesh Grid */}
+          <div className="pg-workspace-mesh-grid" />
+
+          {/* Layer 3: Atmospheric Space Horizon Silhouette */}
+          <div
+            className="pg-workspace-horizon-silhouette"
+            style={{ backgroundImage: `url(${planetHorizonImg})` }}
+          />
+
+          {/* Layer 4: Floating Security Data Particles */}
+          <div className="pg-workspace-particles">
+            <span className="pg-ws-particle p1" />
+            <span className="pg-ws-particle p2" />
+            <span className="pg-ws-particle p3" />
+            <span className="pg-ws-particle p4" />
+            <span className="pg-ws-particle p5" />
+            <span className="pg-ws-particle p6" />
+          </div>
+
+          {/* Layer 5: Subtle Vignette Overlay for Atmospheric Depth */}
+          <div className="pg-workspace-vignette" />
+        </div>
+
         {/* Workspace Topbar */}
         <header className="pg-workspace-topbar">
           <div className="pg-topbar-left">

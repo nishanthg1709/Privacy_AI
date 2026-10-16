@@ -101,6 +101,7 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
         </div>
 
         <div className="pg-workspace-hero-graphic">
+          <div className="pg-workspace-graphic-glow" aria-hidden="true" />
           <img
             src={dashboardTechImg}
             alt="Monochrome security workstation with protected documents"
@@ -177,7 +178,7 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
       </section>
 
       {/* Real Statistics Section */}
-      <section className="pg-workspace-section" aria-label="Key Performance Indicators">
+      <section className="pg-workspace-section pg-anim-dashboard-telemetry" aria-label="Key Performance Indicators">
         <div className="pg-section-header">
           <div>
             <h2 className="pg-section-title">Telemetry &amp; Findings</h2>
@@ -237,7 +238,7 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
       </section>
 
       {/* Activity and Recent Scans Section */}
-      <section className="pg-workspace-section" aria-label="Recent Activity">
+      <section className="pg-workspace-section pg-anim-dashboard-activity" aria-label="Recent Activity">
         <div className="pg-section-header">
           <div>
             <h2 className="pg-section-title">Recent Activity</h2>
@@ -335,7 +336,7 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
       </section>
 
       {/* Architecture Transparency Note */}
-      <section className="pg-workspace-status-callout" role="note">
+      <section className="pg-workspace-status-callout pg-anim-dashboard-note" role="note">
         <div className="pg-status-callout-header">
           <Sparkles size={14} className="pg-text-cream" />
           <strong>Local Neural Inference &amp; Zero-Log Storage</strong>
