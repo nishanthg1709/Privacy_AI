@@ -230,6 +230,44 @@ class AuthService {
     }
   }
 
+  /**
+   * Request password reset email via Supabase Auth
+   */
+  async resetPassword(email) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      throw new Error('Please enter a valid email address.');
+    }
+
+    if (!this.isCloudConfigured() || !supabase) {
+      throw new Error(
+        'Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to frontend/.env.'
+      );
+    }
+
+    const redirectTo =
+      typeof window !== 'undefined' && window.location?.origin
+        ? `${window.location.origin}/login`
+        : undefined;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      ...(redirectTo ? { redirectTo } : {}),
+    });
+
+    if (error) {
+      const msg = error.message || '';
+      if (msg.toLowerCase().includes('rate limit')) {
+        throw new Error('Email rate limit exceeded. Please wait a few moments before trying again.');
+      }
+      if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('network')) {
+        throw new Error('Network error connecting to Supabase. Please verify your connection.');
+      }
+      throw new Error(msg || 'Failed to send password reset email.');
+    }
+
+    return true;
+  }
+
   // --- Private Helpers ---
 
   _mapSupabaseUser(sbUser, emailConfirmationPending = false, profileData = null) {

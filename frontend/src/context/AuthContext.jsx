@@ -102,6 +102,10 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const resetPassword = async (email) => {
+    return authService.resetPassword(email);
+  };
+
   const updateProfile = async ({ displayName }) => {
     if (!user?.id) throw new Error('No authenticated user session.');
     setIsLoading(true);
@@ -151,6 +155,7 @@ export function AuthProvider({ children }) {
         login,
         signup,
         logout,
+        resetPassword,
         updateProfile,
         refreshProfile,
       }}

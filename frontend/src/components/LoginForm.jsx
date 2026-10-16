@@ -10,7 +10,7 @@ import Button from './Button';
  * and redirecting authenticated users to the workspace.
  */
 export default function LoginForm() {
-  const { login, isAuthenticated, isLoading, isCloudConfigured } = useAuth();
+  const { login, isAuthenticated, isLoading, isCloudConfigured, resetPassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -20,7 +20,8 @@ export default function LoginForm() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [forgotPasswordNotice, setForgotPasswordNotice] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetNotice, setResetNotice] = useState('');
 
   // Where to redirect after login (defaults to /app/dashboard)
   const from = location.state?.from?.pathname || '/app/dashboard';
@@ -35,6 +36,7 @@ export default function LoginForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setResetNotice('');
 
     if (!email.trim()) {
       setError('Please enter your work email.');
@@ -64,6 +66,34 @@ export default function LoginForm() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    setError('');
+    setResetNotice('');
+
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setError('Please enter your work email to reset your password.');
+      return;
+    }
+
+    if (!isCloudConfigured) {
+      setError(
+        'Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to frontend/.env.'
+      );
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      await resetPassword(cleanEmail);
+      setResetNotice('Password reset instructions have been sent to your email address.');
+    } catch (err) {
+      setError(err.message || 'Failed to send password reset email. Please try again.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   return (
     <div className="pg-login-form-root">
 
@@ -76,13 +106,10 @@ export default function LoginForm() {
       )}
 
       {/* Forgot Password Feedback Banner */}
-      {forgotPasswordNotice && (
+      {resetNotice && (
         <div className="pg-auth-info-banner" role="status">
           <CheckCircle2 size={16} />
-          <span>
-            Password reset instructions can be triggered through your Supabase project dashboard for{' '}
-            {email || 'your email'}.
-          </span>
+          <span>{resetNotice}</span>
         </div>
       )}
 
@@ -119,9 +146,10 @@ export default function LoginForm() {
             <button
               type="button"
               className="pg-auth-forgot-btn"
-              onClick={() => setForgotPasswordNotice(true)}
+              onClick={handleForgotPassword}
+              disabled={isResetting || isSubmitting || isLoading}
             >
-              Forgot password?
+              {isResetting ? 'Sending...' : 'Forgot password?'}
             </button>
           </div>
 
