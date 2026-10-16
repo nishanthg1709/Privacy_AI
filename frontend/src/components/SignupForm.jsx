@@ -156,7 +156,14 @@ export default function SignupForm() {
       {confirmationNotice && (
         <div className="pg-auth-info-banner" role="status">
           <CheckCircle2 size={16} />
-          <span>{confirmationNotice}</span>
+          <div>
+            <span>{confirmationNotice}</span>
+            <div style={{ marginTop: '8px' }}>
+              <Link to="/login" style={{ color: 'var(--pg-cream)', fontSize: '0.84rem', textDecoration: 'underline' }}>
+                Go to Log In &rarr;
+              </Link>
+            </div>
+          </div>
         </div>
       )}
 

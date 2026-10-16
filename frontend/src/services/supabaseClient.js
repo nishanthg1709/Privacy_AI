@@ -104,7 +104,7 @@ export function getSupabaseConfigStatus() {
   }
 
   const missing = getMissingSupabaseCredentials();
-  let message = 'Supabase credentials are not detected in frontend/.env.';
+  let message = 'Supabase credentials are not detected in frontend/.env (or project root .env).';
   if (missing.length === 2) {
     message = 'Missing VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in frontend/.env.';
   } else if (missing.includes('VITE_SUPABASE_URL')) {

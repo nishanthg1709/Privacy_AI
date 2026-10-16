@@ -405,6 +405,13 @@ class PrivacyEngine:
         # Run detector over protected text
         second_pass_raw = self.detector.detect_all(protected_text)
 
+        # Collect synthetic values if in synthetic mode
+        all_synthetic_values = (
+            {val.lower() for pool in SYNTHETIC_POOLS.values() for val in pool}
+            if privacy_mode == "synthetic"
+            else set()
+        )
+
         # Filter out known safe placeholders like [PERSON_1], [EMAIL_1], etc.
         residual_candidates: List[Dict[str, Any]] = []
         for det in second_pass_raw:
@@ -412,6 +419,11 @@ class PrivacyEngine:
             cleaned = det.text.strip("[] \t")
             if re.fullmatch(r"[A-Z_]+_\d+", cleaned) or re.fullmatch(r"PROPOSED.*", cleaned):
                 continue
+            # If in synthetic mode, verify if the detection is an injected synthetic surrogate
+            if privacy_mode == "synthetic":
+                det_lower = det.text.lower().strip()
+                if det_lower in all_synthetic_values or any(s in det_lower or det_lower in s for s in all_synthetic_values):
+                    continue
             # Also check if the detected span is enclosed within bracket bounds in protected_text
             if det.start > 0 and det.end < len(protected_text):
                 surrounding = protected_text[max(0, det.start - 1) : min(len(protected_text), det.end + 1)]

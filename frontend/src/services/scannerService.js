@@ -301,8 +301,11 @@ function computePrivacyScore(findings) {
   return Math.max(70, Math.min(100, 100 - penalty + 15));
 }
 
+export const scanDocument = scanPayload;
+
 const scannerService = {
   scanPayload,
+  scanDocument,
   checkBackendHealth,
   getBaseUrl,
 };

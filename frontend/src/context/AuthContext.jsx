@@ -40,7 +40,18 @@ export function AuthProvider({ children }) {
         if (!mounted) return;
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
           if (session?.user) {
-            setUser(authService._mapSupabaseUser(session.user));
+            authService
+              .getProfile(session.user.id)
+              .then((profile) => {
+                if (mounted) {
+                  setUser(authService._mapSupabaseUser(session.user, false, profile));
+                }
+              })
+              .catch(() => {
+                if (mounted) {
+                  setUser(authService._mapSupabaseUser(session.user));
+                }
+              });
           } else {
             setUser(null);
           }

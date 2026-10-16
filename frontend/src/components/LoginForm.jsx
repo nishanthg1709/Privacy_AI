@@ -22,6 +22,7 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [forgotPasswordNotice, setForgotPasswordNotice] = useState(false);
 
   // Where to redirect after login (defaults to /app/dashboard)
@@ -55,11 +56,14 @@ export default function LoginForm() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       await login({ email, password, rememberMe });
       navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || 'Authentication failed. Please verify credentials.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -184,8 +188,8 @@ export default function LoginForm() {
           type="submit"
           variant="primary"
           size="lg"
-          isLoading={isLoading}
-          disabled={isLoading || !isCloudConfigured || !email.trim() || !password}
+          isLoading={isLoading || isSubmitting}
+          disabled={isLoading || isSubmitting || !isCloudConfigured || !email.trim() || !password}
           iconAfter={ArrowRight}
           className="pg-w-full pg-auth-submit-btn"
           id="login-submit-btn"

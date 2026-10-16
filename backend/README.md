@@ -1,3 +1,13 @@
+---
+title: PrivacyGuard AI Backend
+emoji: 🛡️
+colorFrom: gray
+colorTo: black
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # PrivacyGuard AI Backend
 
 A local, AI-powered privacy minimization engine built with **FastAPI**, **GLiNER** (Generalist Lightweight Information Extraction), and **Microsoft Presidio**.

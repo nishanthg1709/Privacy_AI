@@ -80,10 +80,11 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS restricted strictly to frontend application origin
+# CORS restricted to frontend application origins, Vercel deployments, and local dev
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
+    allow_origin_regex=r"^https://.*\.vercel\.app$|^https://.*\.hf\.space$|^http://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
@@ -217,7 +218,7 @@ async def scan_payload(payload: ScanRequest) -> ScanResponse:
 if __name__ == "__main__":
     import uvicorn
 
-    host = os.getenv("HOST", "127.0.0.1")
-    port = int(os.getenv("PORT", "8000"))
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "7860"))
     logger.info("Starting PrivacyGuard AI on %s:%d", host, port)
     uvicorn.run("app.main:app", host=host, port=port, reload=False)

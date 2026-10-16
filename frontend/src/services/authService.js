@@ -141,7 +141,17 @@ class AuthService {
     });
 
     if (error) {
-      throw new Error(error.message || 'Authentication failed. Please verify your credentials.');
+      const msg = error.message || '';
+      if (msg.toLowerCase().includes('email not confirmed')) {
+        throw new Error('Please confirm your email address before logging in. Check your inbox for the confirmation link.');
+      }
+      if (msg.toLowerCase().includes('invalid login credentials')) {
+        throw new Error('Invalid email or password. Please verify your credentials.');
+      }
+      if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('network')) {
+        throw new Error('Network error connecting to Supabase. Please verify your internet connection and Supabase URL.');
+      }
+      throw new Error(msg || 'Authentication failed. Please verify your credentials.');
     }
 
     if (!data?.user) {
@@ -186,7 +196,17 @@ class AuthService {
     });
 
     if (error) {
-      throw new Error(error.message || 'Registration failed.');
+      const msg = error.message || '';
+      if (msg.toLowerCase().includes('already registered')) {
+        throw new Error('An account with this email address already exists. Please log in instead.');
+      }
+      if (msg.toLowerCase().includes('rate limit')) {
+        throw new Error('Email rate limit exceeded. Please wait a few moments before trying again.');
+      }
+      if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('network')) {
+        throw new Error('Network error connecting to Supabase. Please verify your internet connection and Supabase URL.');
+      }
+      throw new Error(msg || 'Registration failed.');
     }
 
     if (!data?.user) {
