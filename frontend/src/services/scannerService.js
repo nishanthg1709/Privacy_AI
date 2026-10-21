@@ -101,7 +101,14 @@ export async function checkBackendHealth() {
  * @param {string} [params.strictness] - Optional compliance policy
  * @returns {Promise<Object>} Normalized scan result
  */
-export async function scanPayload({ text, task, privacy_mode, strictness = 'gdpr-hipaa' }) {
+export async function scanPayload({
+  text,
+  task,
+  privacy_mode,
+  strictness = 'gdpr-hipaa',
+  maxRetries = 1,
+  retryDelayMs = 500,
+}) {
   if (!text || typeof text !== 'string' || !text.trim()) {
     throw new Error('Please enter prompt text or upload a document to scan.');
   }
@@ -115,10 +122,7 @@ export async function scanPayload({ text, task, privacy_mode, strictness = 'gdpr
   }
 
   const endpoint = `${baseUrl}/api/scan`;
-
-  const controller = new AbortController();
   const timeoutMs = 20000;
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   const payload = {
     text: text.trim(),
@@ -128,33 +132,52 @@ export async function scanPayload({ text, task, privacy_mode, strictness = 'gdpr
   };
 
   let response;
-  try {
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
+  const attempts = Math.max(0, maxRetries);
+
+  for (let attempt = 0; attempt <= attempts; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      // Retry on transient server errors (502/503/504)
+      if (!response.ok && [502, 503, 504].includes(response.status) && attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        continue;
+      }
+
+      break;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        continue;
+      }
+
+      if (err.name === 'AbortError') {
+        throw new Error(
+          `Scan request timed out after ${timeoutMs / 1000}s. The backend may be busy or experiencing high latency.`,
+          { cause: err }
+        );
+      }
+      // Network failure / Connection refused
+      const hostInfo = baseUrl ? ` at ${baseUrl}` : '';
       throw new Error(
-        `Scan request timed out after ${timeoutMs / 1000}s. The backend may be busy or experiencing high latency.`,
+        `Unable to connect to PrivacyGuard AI backend${hostInfo}. Please verify the backend service is running and accessible.`,
         { cause: err }
       );
     }
-    // Network failure / Connection refused
-    const hostInfo = baseUrl ? ` at ${baseUrl}` : '';
-    throw new Error(
-      `Unable to connect to PrivacyGuard AI backend${hostInfo}. Please verify the backend service is running and accessible.`,
-      { cause: err }
-    );
   }
-
-  clearTimeout(timeoutId);
 
   // Handle HTTP error statuses
   if (!response.ok) {

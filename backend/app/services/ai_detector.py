@@ -434,6 +434,28 @@ class AIDetectorService:
         reconciled = self.reconcile_spans(text, all_raw)
         return reconciled
 
+    @staticmethod
+    def _clean_boundary_artifacts(text: str, start: int, end: int, type_: str) -> Tuple[int, int]:
+        """Trim surrounding delimiters such as CSV commas, quotes, brackets, and column indices."""
+        changed = True
+        while changed and start < end:
+            changed = False
+            # Trim leading whitespace, quotes, and punctuation
+            while start < end and text[start] in " \t\r\n,;:|'\"()[]<>":
+                start += 1
+                changed = True
+            # Trim trailing whitespace, quotes, and punctuation
+            while end > start and text[end - 1] in " \t\r\n,;:|'\"()[]<>":
+                end -= 1
+                changed = True
+            # For PERSON entities in structured CSVs (e.g. '1,Sarah Connor' or '1,"Sarah Connor"'), trim leading row index and delimiter
+            if type_ == "PERSON" and start < end:
+                match = re.match(r"^(\d+[\s,;]+)", text[start:end])
+                if match:
+                    start += len(match.group(1))
+                    changed = True
+        return start, end
+
     def reconcile_spans(self, text: str, detections: List[RawDetection]) -> List[RawDetection]:
         """Reconcile and merge overlapping spans safely.
 
@@ -450,9 +472,12 @@ class AIDetectorService:
 
         for d in detections:
             if 0 <= d.start < d.end <= text_len:
-                # Synchronize snippet with slice
-                d.text = text[d.start:d.end]
-                valid.append(d)
+                start, end = self._clean_boundary_artifacts(text, d.start, d.end, d.type_)
+                if start < end:
+                    d.start = start
+                    d.end = end
+                    d.text = text[start:end]
+                    valid.append(d)
 
         if not valid:
             return []

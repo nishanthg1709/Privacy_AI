@@ -120,6 +120,17 @@ class TestUnitSpanReconciliation:
         reconciled = mock_detector.reconcile_spans(text, detections)
         assert len(reconciled) == 0
 
+    def test_clean_boundary_artifacts_trims_csv_and_quotes(self, mock_detector):
+        """Surrounding delimiters, quotes, and CSV index prefixes must be trimmed from detected entities."""
+        text = '1,"Sarah Connor",sarah@example.com'
+        # Span covering 1,"Sarah Connor"
+        s, e = mock_detector._clean_boundary_artifacts(text, 0, 16, "PERSON")
+        assert text[s:e] == "Sarah Connor"
+
+        # Trailing comma on email
+        s_mail, e_mail = mock_detector._clean_boundary_artifacts(text, 17, len(text), "EMAIL_ADDRESS")
+        assert text[s_mail:e_mail] == "sarah@example.com"
+
 
 class TestUnitPrivacyModesAndPlaceholders:
     """Tests placeholder consistency, privacy modes, and task-relevance rules."""
@@ -507,7 +518,7 @@ class TestApiEndpoints:
 
     def test_cors_headers(self, client):
         """OPTIONS preflight checks respect allowed CORS origins."""
-        for origin in ("http://localhost:5173", "http://127.0.0.1:5173"):
+        for origin in ("http://localhost:5173", "http://127.0.0.1:5173", "https://privacy-ai-kappa.vercel.app"):
             res = client.options(
                 "/api/scan",
                 headers={
@@ -517,3 +528,28 @@ class TestApiEndpoints:
             )
             assert res.status_code == 200
             assert res.headers.get("access-control-allow-origin") == origin
+
+    def test_csv_table_scanning_and_redaction(self, client):
+        """Verifies that uploaded CSV file content is scanned, PII is redacted, and table structure is preserved."""
+        csv_payload = {
+            "text": "id,name,email,notes\n1,Sarah Connor,sarah.connor@cyberdyne.org,SSN: 482-19-9481\n2,John Connor,john.c@resistance.org,sk-live_51M0demo00000000000000000000",
+            "task": "Uploaded File: customers.csv",
+            "privacy_mode": "redaction",
+        }
+        res = client.post("/api/scan", json=csv_payload)
+        assert res.status_code == 200
+        data = res.json()
+
+        assert data["original_length"] == len(csv_payload["text"])
+        assert len(data["findings"]) >= 4
+
+        # Verify CSV column delimiters and structure remain intact
+        protected = data["protected_text"]
+        lines = protected.strip().split("\n")
+        assert len(lines) == 3
+        assert lines[0] == "id,name,email,notes"
+        # First row should start with '1,'
+        assert lines[1].startswith("1,")
+        assert "Sarah Connor" not in protected
+        assert "482-19-9481" not in protected
+        assert "sk-live_51M0demo00000000000000000000" not in protected

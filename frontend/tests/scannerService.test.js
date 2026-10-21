@@ -171,9 +171,102 @@ describe('Scanner Service & API Connectivity', () => {
 
       // Must throw an error, never return fake findings
       await assert.rejects(
-        () => scanPayload({ text: 'Confidential patient notes' }),
+        () => scanPayload({ text: 'Confidential patient notes', maxRetries: 0 }),
         /Unable to connect to PrivacyGuard AI backend/
       );
+    });
+
+    it('retries successfully when transient network error occurs on first attempt', async () => {
+      process.env.VITE_API_BASE_URL = 'https://api.test-privacyguard.com';
+      let attemptCount = 0;
+
+      globalThis.fetch = async () => {
+        attemptCount++;
+        if (attemptCount === 1) {
+          throw new Error('Transient network socket closed');
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            scan_id: 'SCN-RETRY-SUCCESS',
+            protected_text: 'Protected on attempt 2',
+            findings: [],
+            verification: { passed: true, residual_findings_count: 0, residual_risks: [] },
+          }),
+        };
+      };
+
+      const result = await scanPayload({
+        text: 'Document to retry',
+        maxRetries: 1,
+        retryDelayMs: 10,
+      });
+
+      assert.equal(attemptCount, 2);
+      assert.equal(result.scan_id, 'SCN-RETRY-SUCCESS');
+      assert.equal(result.protected_text, 'Protected on attempt 2');
+    });
+
+    it('retries on 503 Service Unavailable and returns data when retry succeeds', async () => {
+      process.env.VITE_API_BASE_URL = 'https://api.test-privacyguard.com';
+      let attemptCount = 0;
+
+      globalThis.fetch = async () => {
+        attemptCount++;
+        if (attemptCount === 1) {
+          return { ok: false, status: 503, json: async () => ({ error: 'Service Unavailable' }) };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            scan_id: 'SCN-503-RECOVERED',
+            protected_text: 'Recovered payload',
+            findings: [],
+          }),
+        };
+      };
+
+      const result = await scanPayload({
+        text: 'Payload recovering from 503',
+        maxRetries: 1,
+        retryDelayMs: 10,
+      });
+
+      assert.equal(attemptCount, 2);
+      assert.equal(result.scan_id, 'SCN-503-RECOVERED');
+    });
+
+    it('correctly handles multi-row CSV document scanning and preserves structure', async () => {
+      process.env.VITE_API_BASE_URL = 'https://api.test-privacyguard.com';
+      const sampleCsv = 'id,name,email\n1,Sarah,sarah@example.com\n2,John,john@example.com';
+
+      globalThis.fetch = async (url, options) => {
+        const body = JSON.parse(options.body);
+        assert.equal(body.text, sampleCsv);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            scan_id: 'SCN-CSV-001',
+            protected_text: 'id,name,email\n1,[PERSON_1],[EMAIL_1]\n2,[PERSON_2],[EMAIL_2]',
+            findings: [
+              { entity_type: 'PERSON', original: 'Sarah', replacement: '[PERSON_1]' },
+              { entity_type: 'EMAIL_ADDRESS', original: 'sarah@example.com', replacement: '[EMAIL_1]' },
+            ],
+          }),
+        };
+      };
+
+      const result = await scanPayload({
+        text: sampleCsv,
+        task: 'Uploaded File: customers.csv',
+      });
+
+      assert.equal(result.scan_id, 'SCN-CSV-001');
+      assert.match(result.protected_text, /id,name,email/);
+      assert.equal(result.findings.length, 2);
     });
   });
 });
