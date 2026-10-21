@@ -43,6 +43,7 @@ AI_DEVICE = os.getenv("AI_DEVICE", "cpu")
 AI_CONFIDENCE_THRESHOLD = float(os.getenv("AI_CONFIDENCE_THRESHOLD", "0.40"))
 ENABLE_PRESIDIO = os.getenv("ENABLE_PRESIDIO", "true").lower() in ("true", "1", "yes")
 ENABLE_GLINER = os.getenv("ENABLE_GLINER", "true").lower() in ("true", "1", "yes")
+SPACY_MODEL = os.getenv("SPACY_MODEL", "en_core_web_sm")
 MAX_PAYLOAD_CHARS = int(os.getenv("MAX_PAYLOAD_CHARS", "100000"))
 
 
@@ -58,6 +59,7 @@ async def lifespan(app: FastAPI):
             confidence_threshold=AI_CONFIDENCE_THRESHOLD,
             enable_presidio=ENABLE_PRESIDIO,
             enable_gliner=ENABLE_GLINER,
+            spacy_model=SPACY_MODEL,
         )
         logger.info(
             "Engine initialization complete: model_loaded=%s, presidio_loaded=%s, status=%s",
@@ -164,6 +166,7 @@ async def health_check() -> HealthResponse:
         service="PrivacyGuard AI Backend",
         version="1.0.0",
         engine_ready=(detector_service.status == "ready"),
+        engine_status=detector_service.status,
     )
 
 
@@ -182,6 +185,7 @@ async def get_engine_status() -> EngineStatus:
         presidio_enabled=detector_service.presidio_loaded,
         supported_categories=detector_service.get_supported_categories(),
         error_message=detector_service.load_error,
+        spacy_model=getattr(detector_service, "spacy_model", "en_core_web_sm"),
     )
 
 

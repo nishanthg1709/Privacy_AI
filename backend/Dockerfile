@@ -11,7 +11,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000 \
     HOST=0.0.0.0 \
-    HOME=/home/user
+    HOME=/home/user \
+    SPACY_MODEL=en_core_web_sm \
+    ENABLE_GLINER=false
 
 # Install system dependencies (build tools, curl for healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -26,11 +28,13 @@ WORKDIR $HOME/app
 # Install Python dependencies first for optimal Docker layer caching
 COPY --chown=user:user requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    python -m spacy download en_core_web_sm && \
+    python -c "import spacy; spacy.load('en_core_web_sm')"
 
-# Pre-download GLiNER model weights during image build
-# This bakes the ~165 MB model into the image so container startup is instantaneous (< 3s)
-RUN python -c "from gliner import GLiNER; GLiNER.from_pretrained('urchade/gliner_small-v2.1')"
+# Pre-download GLiNER model weights during image build if network and memory permit
+# (Enables instant startup when ENABLE_GLINER=true on platforms with >= 2 GB RAM)
+RUN python -c "from gliner import GLiNER; GLiNER.from_pretrained('urchade/gliner_small-v2.1')" || true
 
 # Copy backend application source code
 COPY --chown=user:user . .

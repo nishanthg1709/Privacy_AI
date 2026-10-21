@@ -217,6 +217,18 @@ export default function Results({ onNavigate, scanData: propScanData }) {
         </div>
       </div>
 
+      {/* Degraded Engine Mode Notice if applicable */}
+      {scanData?.engine_status?.status === 'degraded' && (
+        <div className="pg-status-callout-header pg-mb-4" style={{ padding: '0.75rem 1rem', borderColor: 'rgba(255,255,255,0.12)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+            <Info size={16} className="pg-text-cream-subtle" />
+            <span style={{ fontSize: '0.8125rem', color: '#e5e5e5' }}>
+              <strong>Degraded Operational Mode:</strong> Scanned using genuine Microsoft Presidio and deterministic recognizers. GLiNER neural inference is disabled to fit zero-cost hosting memory limits.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Reference Panel 6 Tabs Bar */}
       <div className="pg-results-tabs-bar" role="tablist" aria-label="Results views">
         <button
@@ -622,9 +634,15 @@ export default function Results({ onNavigate, scanData: propScanData }) {
                 <span className="pg-ready-metric-val">{payload.timestamp}</span>
               </div>
               <div className="pg-ready-metric-row">
-                <span className="pg-ready-metric-key">Execution Mode</span>
+                <span className="pg-ready-metric-key">Engine Pipeline</span>
                 <span className="pg-ready-metric-val">
-                  {payload.isLiveBackend ? 'FastAPI Local GLiNER + Presidio' : 'Session In-Memory'}
+                  {scanData?.engine_status?.status === 'degraded'
+                    ? 'Microsoft Presidio Hybrid (Degraded / Low-Memory)'
+                    : scanData?.engine_status?.status === 'ready'
+                    ? 'GLiNER Neural + Presidio'
+                    : payload.isLiveBackend
+                    ? 'FastAPI AI Backend'
+                    : 'Session In-Memory'}
                 </span>
               </div>
             </div>

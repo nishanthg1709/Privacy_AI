@@ -50,7 +50,7 @@ describe('Scanner Service & API Connectivity', () => {
       }
     });
 
-    it('returns isOnline: true when backend /api/health responds with 200', async () => {
+    it('returns isOnline: true and engine_status when backend /api/health responds with 200', async () => {
       process.env.VITE_API_BASE_URL = 'https://api.test-privacyguard.com';
 
       globalThis.fetch = async (url) => {
@@ -58,7 +58,12 @@ describe('Scanner Service & API Connectivity', () => {
         return {
           ok: true,
           status: 200,
-          json: async () => ({ status: 'healthy', model: 'urchade/gliner_small-v2.1' }),
+          json: async () => ({
+            status: 'ok',
+            service: 'PrivacyGuard AI Backend',
+            engine_ready: true,
+            engine_status: 'ready',
+          }),
         };
       };
 
@@ -66,6 +71,31 @@ describe('Scanner Service & API Connectivity', () => {
       assert.equal(health.isOnline, true);
       assert.equal(health.status, 200);
       assert.equal(health.url, 'https://api.test-privacyguard.com');
+      assert.equal(health.engine_ready, true);
+      assert.equal(health.engine_status, 'ready');
+    });
+
+    it('correctly handles degraded engine status from /api/health', async () => {
+      process.env.VITE_API_BASE_URL = 'https://api.test-privacyguard.com';
+
+      globalThis.fetch = async (url) => {
+        assert.equal(url, 'https://api.test-privacyguard.com/api/health');
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: 'ok',
+            service: 'PrivacyGuard AI Backend',
+            engine_ready: false,
+            engine_status: 'degraded',
+          }),
+        };
+      };
+
+      const health = await checkBackendHealth();
+      assert.equal(health.isOnline, true);
+      assert.equal(health.engine_ready, false);
+      assert.equal(health.engine_status, 'degraded');
     });
 
     it('returns isOnline: false when backend is unreachable or connection refused', async () => {

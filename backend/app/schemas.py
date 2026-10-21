@@ -37,6 +37,7 @@ class EngineStatus(BaseModel):
     presidio_enabled: bool = Field(..., description="True if Microsoft Presidio recognizer is active")
     supported_categories: List[str] = Field(..., description="List of all supported entity categories")
     error_message: Optional[str] = Field(None, description="Detailed diagnostic error message if in degraded/error state")
+    spacy_model: Optional[str] = Field("en_core_web_sm", description="spaCy model used by Presidio")
 
 
 class VerificationResult(BaseModel):
@@ -107,3 +108,4 @@ class HealthResponse(BaseModel):
     service: str = Field("PrivacyGuard AI Backend", description="Service identifier")
     version: str = Field("1.0.0", description="API version")
     engine_ready: bool = Field(..., description="True if local AI engine is loaded")
+    engine_status: str = Field("ready", description="'ready' (full neural GLiNER), 'degraded' (genuine Presidio + deterministic rules), or 'error'")

@@ -171,6 +171,36 @@ class AIDetectorService:
             "driver license",
         ]
 
+    def _create_presidio_analyzer(self, model_name: str = "en_core_web_sm"):
+        """Create Presidio AnalyzerEngine explicitly bound to a lightweight spaCy model.
+
+        CRITICAL ARCHITECTURAL REQUIREMENT:
+        Never call AnalyzerEngine() without an explicit nlp_engine!
+        Presidio's built-in default configuration attempts to load 'en_core_web_lg' (~800MB),
+        which fails with 'spaCy model en_core_web_lg cannot be found' or causes OOM on
+        Render's 512MB RAM free instance.
+        """
+        from presidio_analyzer import AnalyzerEngine
+        from presidio_analyzer.nlp_engine import NlpEngineProvider
+        import spacy
+
+        # If model is not loaded/installed, attempt download
+        if not spacy.util.is_package(model_name):
+            logger.info("spaCy model '%s' not found locally; downloading...", model_name)
+            try:
+                import spacy.cli
+                spacy.cli.download(model_name)
+            except Exception as dl_err:
+                logger.warning("spaCy CLI download of '%s' failed: %s", model_name, dl_err)
+
+        nlp_configuration = {
+            "nlp_engine_name": "spacy",
+            "models": [{"lang_code": "en", "model_name": model_name}],
+        }
+        provider = NlpEngineProvider(nlp_configuration=nlp_configuration)
+        nlp_engine = provider.create_engine()
+        return AnalyzerEngine(nlp_engine=nlp_engine)
+
     def load_engines(
         self,
         model_name: str = "urchade/gliner_small-v2.1",
@@ -178,6 +208,7 @@ class AIDetectorService:
         confidence_threshold: float = 0.40,
         enable_presidio: bool = True,
         enable_gliner: bool = True,
+        spacy_model: Optional[str] = None,
     ) -> None:
         """Load pretrained contextual model and Presidio framework once on startup.
 
@@ -202,25 +233,28 @@ class AIDetectorService:
         self.model_name = model_name
         self.device = device
         self.confidence_threshold = confidence_threshold
+        if spacy_model is None:
+            spacy_model = os.getenv("SPACY_MODEL", "en_core_web_sm")
+        self.spacy_model = spacy_model
 
-        # 0. Limit PyTorch CPU threads & tokenizers parallelism before loading
+        # 0. Limit PyTorch CPU threads & tokenizers parallelism if loading neural model
         os.environ.setdefault("OMP_NUM_THREADS", "1")
         os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
         os.environ.setdefault("MKL_NUM_THREADS", "1")
         os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-        try:
-            import torch
-            torch.set_num_threads(1)
-            try:
-                torch.set_num_interop_threads(1)
-            except RuntimeError:
-                pass  # Can only be set before parallel operations execute
-        except Exception as te:
-            logger.debug("PyTorch thread configuration note: %s", te)
-
         # 1. Load GLiNER contextual model
         if enable_gliner:
+            try:
+                import torch
+                torch.set_num_threads(1)
+                try:
+                    torch.set_num_interop_threads(1)
+                except RuntimeError:
+                    pass  # Can only be set before parallel operations execute
+            except Exception as te:
+                logger.debug("PyTorch thread configuration note: %s", te)
+
             try:
                 logger.info("Loading GLiNER contextual model '%s' onto device '%s'...", model_name, device)
                 from gliner import GLiNER
@@ -242,18 +276,16 @@ class AIDetectorService:
             self.model_loaded = False
             self.gliner_model = None
             if not self.load_error:
-                self.load_error = "GLiNER contextual model disabled via configuration."
+                self.load_error = "Running in degraded mode (Microsoft Presidio + Custom Rules). GLiNER contextual AI is disabled to comply with zero-cost hosting memory limits."
 
         # 2. Load Microsoft Presidio recognizer
         if enable_presidio:
             if not self.presidio_loaded or self.presidio_analyzer is None:
                 try:
-                    logger.info("Initializing Microsoft Presidio AnalyzerEngine...")
-                    from presidio_analyzer import AnalyzerEngine
-
-                    self.presidio_analyzer = AnalyzerEngine()
+                    logger.info("Initializing Microsoft Presidio AnalyzerEngine with spaCy model '%s'...", self.spacy_model)
+                    self.presidio_analyzer = self._create_presidio_analyzer(model_name=self.spacy_model)
                     self.presidio_loaded = True
-                    logger.info("Presidio AnalyzerEngine initialized successfully.")
+                    logger.info("Presidio AnalyzerEngine initialized successfully with '%s'.", self.spacy_model)
                 except (MemoryError, Exception) as pe:
                     self.presidio_loaded = False
                     self.presidio_analyzer = None

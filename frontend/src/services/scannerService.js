@@ -72,7 +72,19 @@ export async function checkBackendHealth() {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-    return { isOnline: res.ok, status: res.status, url: targetUrl };
+    let healthData = null;
+    try {
+      healthData = await res.json();
+    } catch {
+      // non-JSON response
+    }
+    return {
+      isOnline: res.ok,
+      status: res.status,
+      url: targetUrl,
+      engine_ready: Boolean(healthData?.engine_ready),
+      engine_status: healthData?.engine_status || (healthData?.engine_ready ? 'ready' : 'degraded'),
+    };
   } catch {
     clearTimeout(timeoutId);
     // Try fallback root check

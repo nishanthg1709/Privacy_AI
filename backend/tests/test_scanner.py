@@ -350,7 +350,7 @@ class TestUnitModelLoadingFailuresAndDegradedState:
         assert detector.model_loaded is False
         assert detector.presidio_loaded is True
         assert detector.status == "degraded"
-        assert "disabled via configuration" in detector.load_error.lower()
+        assert "disabled" in detector.load_error.lower()
 
     def test_health_endpoint_separates_liveness_from_engine_readiness(self, client):
         """Health check reports status='ok' (server responsive) but engine_ready=False when degraded."""
@@ -364,6 +364,7 @@ class TestUnitModelLoadingFailuresAndDegradedState:
             assert res.status_code == 200
             assert res.json()["status"] == "ok"
             assert res.json()["engine_ready"] is False
+            assert res.json()["engine_status"] == "degraded"
 
             # Ready status: engine is fully loaded
             detector_service.status = "ready"
@@ -371,6 +372,7 @@ class TestUnitModelLoadingFailuresAndDegradedState:
             assert res.status_code == 200
             assert res.json()["status"] == "ok"
             assert res.json()["engine_ready"] is True
+            assert res.json()["engine_status"] == "ready"
         finally:
             detector_service.status = orig_status
 
@@ -398,8 +400,77 @@ class TestUnitModelLoadingFailuresAndDegradedState:
         assert "status" in data
         assert "model_loaded" in data
         assert "supported_categories" in data
+        assert "spacy_model" in data
+        assert data["spacy_model"] == "en_core_web_sm"
         assert isinstance(data["supported_categories"], list)
         assert len(data["supported_categories"]) > 0
+
+    def test_presidio_initialization_uses_en_core_web_sm_strictly(self):
+        """Presidio must be initialized strictly with lightweight en_core_web_sm, never en_core_web_lg."""
+        detector = AIDetectorService()
+        analyzer = detector._create_presidio_analyzer("en_core_web_sm")
+        assert analyzer is not None
+        assert analyzer.nlp_engine is not None
+        # Verify the resident spaCy model name is core_web_sm
+        loaded_model_name = analyzer.nlp_engine.nlp["en"].meta.get("name")
+        assert loaded_model_name == "core_web_sm"
+        assert loaded_model_name != "core_web_lg"
+
+    def test_presidio_degraded_mode_initialization_without_gliner(self):
+        """When GLiNER is disabled (e.g. Render 512MB RAM cap), Presidio initializes with en_core_web_sm in degraded mode."""
+        detector = AIDetectorService()
+        detector.load_engines(enable_gliner=False, enable_presidio=True, spacy_model="en_core_web_sm")
+
+        assert detector.model_loaded is False
+        assert detector.presidio_loaded is True
+        assert detector.status == "degraded"
+        assert detector.spacy_model == "en_core_web_sm"
+        assert "degraded" in detector.load_error.lower()
+
+        # Real inference with Presidio in degraded mode
+        detections = detector.detect_all("Contact Sarah at sarah@example.com or call 555-0199.")
+        types_detected = {d.type_ for d in detections}
+        assert "EMAIL_ADDRESS" in types_detected
+
+    def test_presidio_initialization_failure_reports_clean_error_without_fallback(self):
+        """If spaCy engine provider throws an error, detector enters error state without attempting en_core_web_lg."""
+        detector = AIDetectorService()
+        with patch.object(detector, "_create_presidio_analyzer", side_effect=OSError("Can't find model 'en_core_web_sm'")):
+            detector.load_engines(enable_gliner=False, enable_presidio=True)
+
+        assert detector.presidio_loaded is False
+        assert detector.presidio_analyzer is None
+        assert detector.status == "error"
+        assert "Can't find model 'en_core_web_sm'" in detector.load_error
+        # Must NOT attempt to load en_core_web_lg
+        assert "en_core_web_lg" not in detector.load_error
+
+    def test_engine_status_endpoint_in_degraded_mode(self, client):
+        """GET /api/engine-status accurately reports degraded mode parameters when GLiNER is disabled."""
+        from app.services.ai_detector import detector_service
+
+        orig_status = detector_service.status
+        orig_model_loaded = detector_service.model_loaded
+        orig_error = detector_service.load_error
+        try:
+            detector_service.status = "degraded"
+            detector_service.model_loaded = False
+            detector_service.presidio_loaded = True
+            detector_service.load_error = "Running in degraded mode (Microsoft Presidio + Custom Rules). GLiNER contextual AI is disabled to comply with zero-cost hosting memory limits."
+
+            res = client.get("/api/engine-status")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["status"] == "degraded"
+            assert data["model_loaded"] is False
+            assert data["presidio_enabled"] is True
+            assert data["inference_backend"] == "presidio_hybrid"
+            assert data["spacy_model"] == "en_core_web_sm"
+            assert "degraded" in data["error_message"].lower()
+        finally:
+            detector_service.status = orig_status
+            detector_service.model_loaded = orig_model_loaded
+            detector_service.load_error = orig_error
 
 
 class TestUnitValidationAndPayloadLimits:
