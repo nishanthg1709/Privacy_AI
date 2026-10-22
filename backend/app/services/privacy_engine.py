@@ -376,8 +376,9 @@ class PrivacyEngine:
         for start, end, replacement, _ in sorted_plans:
             if start > curr:
                 parts.append(original_text[curr:start])
-            parts.append(replacement)
-            curr = end
+            if start >= curr:
+                parts.append(replacement)
+                curr = max(curr, end)
         if curr < len(original_text):
             parts.append(original_text[curr:])
         return "".join(parts)
@@ -570,8 +571,8 @@ class PrivacyEngine:
                 "risk_type": "Triad Re-Identification Risk",
                 "severity": "High",
                 "entities_involved": ["PERSON", "LOCATION", "ORGANIZATION"],
-                "description": "The co-occurrence of a personal name, specific location, and employer/organization significantly narrows the candidate pool, allowing external linkage even if direct IDs are removed.",
-                "mitigation": "Ensure both person and fine-grained location tokens are minimized."
+                "description": "Co-occurrence of personal identity, specific location, and employer/organization in source input creates demographic linkage risk. While all three entity types are redacted in output, verify that residual context does not allow deductive re-identification.",
+                "mitigation": "Review output to confirm that role descriptions, department names, or unique narrative details surrounding the redacted triad tokens cannot uniquely identify the individual."
             })
 
         # Combination 2: Person + Protected Health Information

@@ -96,6 +96,25 @@ SECRET_PATTERNS = [
     (r"\b(?:FAKE_API_KEY_PLACEHOLDER)\b", "API_KEY", "Developer Credentials", "High"),
     (r"\bMRN\s*(?:#|no\.?|number)?\s*([0-9]{5,10})\b", "MRN", "Protected Health Information (PHI)", "High"),
     (r"\bBCBS-[A-Z0-9\-]{6,16}\b", "HEALTH_INSURANCE_ID", "Protected Health Information (PHI)", "High"),
+    (r"\b\d{3}-\d{2}-\d{4}\b", "SSN", "Government ID", "High"),
+    (
+        r"(?i)\b\d{1,5}\s+[A-Za-z0-9\.\s]{2,35}\b(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Court|Ct|Lane|Ln|Way|Place|Pl|Square|Sq|Terrace|Ter|Parkway|Pkwy|Circle|Cir|Highway|Hwy|Loop)\b(?:\s+(?:Apt|Suite|Ste|Unit|#)\s*[A-Za-z0-9\-]+)?",
+        "LOCATION",
+        "Location Data",
+        "Medium",
+    ),
+    (
+        r"(?:\+?1[-.\s]?)?(?:\([0-9]{3}\)\s*|[0-9]{3}[-.\s])[0-9]{3}[-.\s][0-9]{4}\b|\b[2-9][0-9]{2}[-.\s][0-9]{4}\b",
+        "PHONE_NUMBER",
+        "Contact PII",
+        "Medium",
+    ),
+    (
+        r"\b(?:4[0-9]{3}|5[1-5][0-9]{2}|6011|3[47][0-9]{2})[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}\b",
+        "CREDIT_CARD",
+        "Financial Data",
+        "High",
+    ),
 ]
 
 # Field header/label words that models sometimes tag as PII values by mistake
@@ -259,14 +278,19 @@ class AIDetectorService:
             provider = NlpEngineProvider(nlp_configuration=nlp_configuration)
             nlp_engine = provider.create_engine()
 
-            # Disable parser if present to save CPU and ~40 MB RAM during inference
+            # Optimize spaCy pipeline: disable parser and ensure comma without whitespace (e.g. in CSV tables)
+            # is split into separate tokens so adjacent columns and row indices are not merged with entity names.
             try:
                 if hasattr(nlp_engine, "nlp") and isinstance(nlp_engine.nlp, dict):
                     spacy_nlp = nlp_engine.nlp.get("en")
-                    if spacy_nlp and "parser" in spacy_nlp.pipe_names:
-                        spacy_nlp.disable_pipes("parser")
+                    if spacy_nlp:
+                        if "parser" in spacy_nlp.pipe_names:
+                            spacy_nlp.disable_pipes("parser")
+                        from spacy.util import compile_infix_regex
+                        infixes = list(spacy_nlp.Defaults.infixes) + [r","]
+                        spacy_nlp.tokenizer.infix_finditer = compile_infix_regex(infixes).finditer
             except Exception as pe:
-                logger.debug("Note on disabling parser: %s", pe)
+                logger.debug("Note on customizing spaCy pipeline / infixes: %s", pe)
 
             return AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en"])
 
@@ -467,6 +491,14 @@ class AIDetectorService:
             snippet = text_segment[res.start:res.end]
             if snippet.strip().lower() in LABEL_STOPWORDS:
                 continue
+            if res.entity_type == "DATE_TIME":
+                snip = snippet.strip()
+                if (
+                    re.fullmatch(r"\d{1,2}", snip)
+                    or re.match(r"^\d{3}[-.]", snip)
+                    or re.fullmatch(r"\d{4}[- ]\d{4}[- ]\d{4}[- ]\d{4}", snip)
+                ):
+                    continue
             entity_type = res.entity_type
             score = float(res.score)
 
@@ -611,9 +643,15 @@ class AIDetectorService:
             while end > start and text[end - 1] in " \t\r\n,;:|'\"()[]<>":
                 end -= 1
                 changed = True
-            # For PERSON entities in structured CSVs (e.g. '1,Sarah Connor' or '1,"Sarah Connor"'), trim leading row index and delimiter
+            # For entities in structured CSVs (e.g. '1,Sarah Connor', '1,Acme Corp', '1,123 Main St'),
+            # trim leading row index and delimiter if accidentally captured.
             if type_ == "PERSON" and start < end:
-                match = re.match(r"^(\d+[\s,;]+)", text[start:end])
+                match = re.match(r"^(\d+[\s,;\t]+)", text[start:end])
+                if match:
+                    start += len(match.group(1))
+                    changed = True
+            elif type_ not in ("SSN", "PHONE_NUMBER", "CREDIT_CARD", "BANK_ACCOUNT", "MRN", "DATE_TIME", "DATE_OF_BIRTH") and start < end:
+                match = re.match(r"^(\d+[,;\t]+)", text[start:end])
                 if match:
                     start += len(match.group(1))
                     changed = True
@@ -627,11 +665,31 @@ class AIDetectorService:
         2. If an email address encompasses a name, keep the EMAIL_ADDRESS entity
            so the entire communication token is protected.
         3. Deterministic secret detections take precedence.
-        4. For identical or overlapping spans, pick highest confidence / broader span.
-        5. Return non-overlapping sorted list.
+        4. If a generic entity overlaps with a structured identifier (SSN, credit card, etc.),
+           trim the generic entity boundary so both entities are preserved and redacted.
+        5. For identical or overlapping spans, pick highest confidence / broader span.
+        6. Return non-overlapping sorted list.
         """
         valid: List[RawDetection] = []
         text_len = len(text)
+
+        STRUCTURED_CRITICAL_TYPES = {
+            "SSN",
+            "CREDIT_CARD",
+            "EMAIL_ADDRESS",
+            "PHONE_NUMBER",
+            "BANK_ACCOUNT",
+            "IBAN",
+            "MRN",
+            "AWS_ACCESS_KEY",
+            "API_KEY",
+            "GITHUB_TOKEN",
+            "GITLAB_TOKEN",
+            "SECRET_KEY",
+            "PASSWORD",
+            "HEALTH_INSURANCE_ID",
+            "CRYPTO_WALLET",
+        }
 
         for d in detections:
             if 0 <= d.start < d.end <= text_len:
@@ -669,6 +727,30 @@ class AIDetectorService:
             if current.type_ == "EMAIL_ADDRESS" and last.type_ != "EMAIL_ADDRESS":
                 # Replace with wider email address
                 reconciled[-1] = current
+                continue
+
+            # Special case: Non-destructive reconciliation between generic NLP spans and structured identifiers.
+            # When an entity with broad boundaries (e.g. ORGANIZATION or LOCATION) overlaps with a structured
+            # identifier (e.g. SSN, credit card, phone), trim the generic entity boundary non-destructively
+            # so BOTH entities are preserved and redacted instead of leaving structured PII exposed.
+            if last.type_ not in STRUCTURED_CRITICAL_TYPES and current.type_ in STRUCTURED_CRITICAL_TYPES:
+                new_start, new_end = self._clean_boundary_artifacts(text, last.start, current.start, last.type_)
+                if new_start < new_end:
+                    last.start = new_start
+                    last.end = new_end
+                    last.text = text[new_start:new_end]
+                    reconciled.append(current)
+                else:
+                    reconciled[-1] = current
+                continue
+
+            if last.type_ in STRUCTURED_CRITICAL_TYPES and current.type_ not in STRUCTURED_CRITICAL_TYPES:
+                new_start, new_end = self._clean_boundary_artifacts(text, last.end, current.end, current.type_)
+                if new_start < new_end:
+                    current.start = new_start
+                    current.end = new_end
+                    current.text = text[new_start:new_end]
+                    reconciled.append(current)
                 continue
 
             # Special case: deterministic rule secret wins

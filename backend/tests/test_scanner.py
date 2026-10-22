@@ -825,5 +825,111 @@ class TestDisabledGlinerAndLowMemoryOperations:
         assert "Verification passed" in resp.verification.explanation
 
 
+class TestVerificationAndRegressionAudit:
+    """Regression suite covering secondary verification audit, overlap trimming, and re-identification risks."""
+
+    def test_genuine_residual_pii_fails_verification(self):
+        """Secondary verification detects genuine unredacted SSNs or credentials and rejects certification."""
+        from app.services.privacy_engine import privacy_engine
+
+        leaked_payload = "Approved summary: [PERSON_1] authorized transfer. Residual SSN: 987-65-4321, key=sk-live998877665544332211"
+        v = privacy_engine._verify_protected_text(leaked_payload, [], "redaction")
+
+        assert v.passed is False
+        assert v.residual_findings_count >= 1
+        assert "Verification alert: Secondary audit discovered" in v.explanation
+        detected_types = {item["type"] for item in v.second_pass_findings}
+        assert "SSN" in detected_types or "API_KEY" in detected_types
+
+    def test_successfully_redacted_pii_passes_verification(self):
+        """When all sensitive entities are protected, secondary verification passes with zero residuals."""
+        from app.services.privacy_engine import privacy_engine
+
+        clean_csv = (
+            "id,name,email,ssn,address,employer\n"
+            "1,Alice Johnson,alice@example.com,123-45-6789,123 Main St,Acme Corp 84\n"
+            "2,Bob Smith,bob@test.com,987-65-4321,456 Oak Ave,Global Tech 92\n"
+            "3,Emily Davis,emily@corp.org,555-01-9999,789 Pine Blvd Suite 10,Innovate LLC\n"
+        )
+        resp = privacy_engine.process_scan(clean_csv, task="CSV Audit", privacy_mode="redaction")
+
+        assert resp.verification.passed is True
+        assert resp.verification.residual_findings_count == 0
+        assert "Verification passed" in resp.verification.explanation
+        assert "123-45-6789" not in resp.protected_text
+        assert "alice@example.com" not in resp.protected_text
+        assert "Alice Johnson" not in resp.protected_text
+        assert "123 Main St" not in resp.protected_text
+
+    def test_false_positive_date_filtering_for_numbers_and_cards(self):
+        """Bare 1-2 digit row IDs, phone numbers, and card numbers are not misclassified as dates."""
+        from app.services.ai_detector import detector_service
+        detector_service.ensure_presidio_loaded()
+
+        # Bare numbers should not become DATE_TIME detections
+        converted_1 = detector_service._convert_presidio_results(
+            "16",
+            [type("Res", (), {"start": 0, "end": 2, "entity_type": "DATE_TIME", "score": 0.85})()]
+        )
+        assert len(converted_1) == 0
+
+        # Hyphenated phone-like numbers should not become DATE_TIME detections
+        converted_2 = detector_service._convert_presidio_results(
+            "555-0106",
+            [type("Res", (), {"start": 0, "end": 8, "entity_type": "DATE_TIME", "score": 0.85})()]
+        )
+        assert len(converted_2) == 0
+
+    def test_overlapping_generic_and_structured_entities_preserved(self, mock_detector):
+        """Broad NLP entity boundaries overlapping structured identifiers do not drop structured PII."""
+        full_text = "Acme Corp 84,123-45-6789 is the company account."
+        org = RawDetection(
+            start=0, end=16, text="Acme Corp 84,123", type_="ORGANIZATION",
+            category="Organization Data", risk="Low", confidence=0.85,
+            source="presidio", explanation="org"
+        )
+        ssn = RawDetection(
+            start=13, end=24, text="123-45-6789", type_="SSN",
+            category="Government ID", risk="High", confidence=0.99,
+            source="deterministic_rule", explanation="ssn"
+        )
+
+        reconciled = mock_detector.reconcile_spans(full_text, [org, ssn])
+        assert len(reconciled) == 2
+        assert reconciled[0].type_ == "ORGANIZATION"
+        assert reconciled[0].text == "Acme Corp 84"
+        assert reconciled[1].type_ == "SSN"
+        assert reconciled[1].text == "123-45-6789"
+
+    def test_synthetic_surrogate_placeholders_not_flagged_in_verification(self):
+        """Synthetic surrogate mode replaces entities with safe surrogates that do not fail verification."""
+        from app.services.privacy_engine import privacy_engine
+
+        input_text = "Please reach out to Dr. Gregory House at gregory.house@princeton-plainsboro.org for medical review."
+        resp = privacy_engine.process_scan(input_text, task="PHI anonymization", privacy_mode="synthetic")
+
+        assert resp.verification.passed is True
+        assert resp.verification.residual_findings_count == 0
+        assert "gregory.house@princeton-plainsboro.org" not in resp.protected_text
+
+    def test_triad_reidentification_risk_detected_with_actionable_warning(self):
+        """Triad combination of name, location, and organization triggers warning with mitigation advice."""
+        from app.services.privacy_engine import privacy_engine
+
+        input_text = "Alice Johnson works at Acme Corp in Denver, Colorado."
+        resp = privacy_engine.process_scan(input_text, task="Linkage analysis", privacy_mode="redaction")
+
+        triad_risks = [cr for cr in resp.combination_risks if cr["risk_type"] == "Triad Re-Identification Risk"]
+        assert len(triad_risks) == 1
+        risk = triad_risks[0]
+        assert risk["severity"] == "High"
+        assert "PERSON" in risk["entities_involved"]
+        assert "LOCATION" in risk["entities_involved"]
+        assert "ORGANIZATION" in risk["entities_involved"]
+        assert "mitigation" in risk
+        assert len(risk["mitigation"]) > 10
+
+
+
 
 
