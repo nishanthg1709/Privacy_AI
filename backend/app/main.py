@@ -221,14 +221,26 @@ async def scan_payload(payload: ScanRequest) -> ScanResponse:
         )
 
     import time
+    import hashlib
 
     start_perf = time.perf_counter()
     correlation_id = payload.request_id or f"REQ-{int(time.time()*1000)}"
 
-    # Check idempotency cache first
+    # Deterministic content hash for robust deduplication across retries and double clicks
+    content_hash = hashlib.sha256(
+        f"{payload.privacy_mode}:{payload.task}:{payload.strictness}:{payload.text}".encode("utf-8")
+    ).hexdigest()
+
+    # Check idempotency cache first (both by request_id and content_hash)
+    cached = None
     if payload.request_id and payload.request_id in _idempotency_cache:
+        cached = _idempotency_cache[payload.request_id]
+    elif content_hash in _idempotency_cache:
+        cached = _idempotency_cache[content_hash]
+
+    if cached:
         logger.info("Scan cache hit | correlation_id=%s | returning cached response", correlation_id)
-        return _idempotency_cache[payload.request_id]
+        return cached
 
     logger.info(
         "Scan started | correlation_id=%s | task=%s | mode=%s | chars=%d",
@@ -241,20 +253,29 @@ async def scan_payload(payload: ScanRequest) -> ScanResponse:
     try:
         # Sequential processing lock to prevent memory spikes on Render 512MB instance
         async with _scan_lock:
+            # Check cache again once lock is acquired in case an in-flight duplicate just completed
             if payload.request_id and payload.request_id in _idempotency_cache:
                 return _idempotency_cache[payload.request_id]
+            if content_hash in _idempotency_cache:
+                return _idempotency_cache[content_hash]
 
-            response = privacy_engine.process_scan(
+            # Execute CPU-intensive NLP scan in threadpool so FastAPI event loop stays
+            # completely responsive to health checks (/api/health) and keepalives.
+            response = await asyncio.to_thread(
+                privacy_engine.process_scan,
                 text=payload.text,
                 task=payload.task or "Prompt Privacy Audit",
                 privacy_mode=payload.privacy_mode or "strict",
                 strictness=payload.strictness or "gdpr-hipaa",
             )
 
+            # Store in cache under both request_id and content_hash
             if payload.request_id:
                 _idempotency_cache[payload.request_id] = response
-                if len(_idempotency_cache) > _MAX_IDEMPOTENCY_CACHE:
-                    _idempotency_cache.popitem(last=False)
+            _idempotency_cache[content_hash] = response
+
+            while len(_idempotency_cache) > _MAX_IDEMPOTENCY_CACHE:
+                _idempotency_cache.popitem(last=False)
 
             elapsed_ms = (time.perf_counter() - start_perf) * 1000
             logger.info(

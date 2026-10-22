@@ -426,9 +426,18 @@ class PrivacyEngine:
             else set()
         )
 
+        # Find all placeholder spans in protected_text to prevent boundary artifacts from falsely failing verification
+        placeholder_spans = [
+            (m.start(), m.end())
+            for m in re.finditer(r"\[[A-Z_]+_\d+\]|\[PROPOSED[^\]]*\]", protected_text)
+        ]
+
         # Filter out known safe placeholders like [PERSON_1], [EMAIL_1], etc.
         residual_candidates: List[Dict[str, Any]] = []
         for det in second_pass_raw:
+            # Check if detection span overlaps with any generated placeholder span
+            if any(max(det.start, ps) < min(det.end, pe) for ps, pe in placeholder_spans):
+                continue
             # Check if snippet matches our generated placeholders (with or without brackets)
             cleaned = det.text.strip("[] \t")
             if re.fullmatch(r"[A-Z_]+_\d+", cleaned) or re.fullmatch(r"PROPOSED.*", cleaned):

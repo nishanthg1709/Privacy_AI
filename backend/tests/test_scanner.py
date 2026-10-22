@@ -777,5 +777,53 @@ class TestDisabledGlinerAndLowMemoryOperations:
         categories = {s.category for s in secrets}
         assert "Developer Credentials" in categories
 
+    def test_content_hash_idempotency_with_different_request_ids(self, client):
+        """Identical content returns cached response even when client generates new request_id on retry."""
+        text = "Confidential report: patient John Connor, DOB: 02/28/1985, email: jconnor@resistance.net"
+        payload1 = {
+            "text": text,
+            "task": "Medical Records Review",
+            "privacy_mode": "strict",
+            "request_id": "REQ-ATTEMPT-1",
+        }
+        res1 = client.post("/api/scan", json=payload1)
+        assert res1.status_code == 200
+        data1 = res1.json()
+
+        # Second request with identical content but completely different request_id (simulating a retry after timeout)
+        payload2 = {
+            "text": text,
+            "task": "Medical Records Review",
+            "privacy_mode": "strict",
+            "request_id": "REQ-ATTEMPT-2-RETRY",
+        }
+        res2 = client.post("/api/scan", json=payload2)
+        assert res2.status_code == 200
+        data2 = res2.json()
+
+        # Must return the cached scan result immediately
+        assert data1["scan_id"] == data2["scan_id"]
+        assert data1["protected_text"] == data2["protected_text"]
+
+    def test_large_csv_verification_passes_without_placeholder_boundary_artifacts(self):
+        """Secondary verification on multi-row CSVs does not falsely flag bracketed placeholder boundaries."""
+        from app.services.privacy_engine import privacy_engine
+
+        header = "id,name,email,phone,address,notes,credit_card,ssn,company,ip_address\n"
+        rows = [
+            f"{i},Person {i},person{i}@example.com,555-01{i:02d},123 Main St City {i},"
+            f"Customer account notes for user {i},4532-1234-5678-{i:04d},123-45-{i:04d},"
+            f"Company {i},192.168.1.{i % 250}"
+            for i in range(25)
+        ]
+        csv_data = header + "\n".join(rows)
+
+        resp = privacy_engine.process_scan(csv_data, task="Batch CSV Redaction", privacy_mode="strict")
+        # Verification must pass: no false-positive residual findings from placeholders
+        assert resp.verification.passed is True
+        assert resp.verification.residual_findings_count == 0
+        assert "Verification passed" in resp.verification.explanation
+
+
 
 
