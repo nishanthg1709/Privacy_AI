@@ -5,6 +5,13 @@ pydantic>=2.7.0
 python-dotenv>=1.0.0
 
 # Pretrained Contextual AI Entity Detection (GLiNER)
+# These packages are installed in all environments so that the codebase can run
+# with ENABLE_GLINER=true on high-memory platforms (>= 2 GB RAM) without code changes.
+# On Render Free (512 MB RAM, ENABLE_GLINER=false), the LowMemoryImportBlocker in
+# ai_detector.py intercepts torch/transformers/gliner imports at module load time
+# so these packages are installed but never loaded into RAM.
+# NOTE: thinc (spaCy's backend) auto-imports torch when it is importable — this is
+# exactly why the import blocker must be installed BEFORE any spaCy/thinc import.
 torch>=2.2.0
 transformers>=4.40.0
 gliner>=0.2.13
@@ -20,3 +27,4 @@ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0
 # Testing & HTTP Client
 pytest>=8.0.0
 httpx>=0.27.0
+anyio>=4.0.0

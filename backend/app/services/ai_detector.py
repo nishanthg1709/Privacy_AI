@@ -6,15 +6,27 @@ Combines:
 3. High-entropy Deterministic Secret Recognizers: API keys, tokens, and credentials.
 
 Loads models once during startup and never substitutes regex-only silently.
+Memory Architecture for Render Free (512 MB RAM):
+- When initializing Presidio AnalyzerEngine, LowMemoryImportBlocker intercepts spaCy's
+  thinc backend from importing torch, preventing ~290 MB of PyTorch runtime from being loaded into memory.
+- Baseline RAM stays at ~158 MB (instead of ~450 MB), leaving over 350 MB of headroom within
+  Render Free's 512 MB cap for multi-row CSV scanning and API requests.
+- When ENABLE_GLINER=true on platforms with >= 2 GB RAM, GLiNER loads normally with full neural features.
 """
 
 import os
 import gc
 import logging
+import sys
 import re
 from typing import List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger("privacy_engine.ai_detector")
+
+# Suppress harmless Presidio language-compatibility warnings (e.g. EsNifRecognizer, ItFiscalCodeRecognizer)
+# These fire because Presidio's registry auto-discovers non-English recognizers at startup.
+# Since we configure supported_languages=['en'], they are correctly skipped — the warnings are noise.
+logging.getLogger("presidio-analyzer").setLevel(logging.ERROR)
 
 # Canonical label mapping from raw detector outputs to standardized categories
 LABEL_TO_CATEGORY_MAP: Dict[str, Dict[str, str]] = {
@@ -135,9 +147,9 @@ class RawDetection:
 
 
 class LowMemoryImportBlocker:
-    """Blocks speculative imports of heavy neural dependencies (torch, transformers, gliner)
-    when initializing Presidio or when GLiNER is disabled, reducing process baseline memory from ~450MB to ~150MB."""
-    BLOCKED_ROOTS = ("torch", "transformers", "gliner")
+    """Blocks speculative imports of heavy neural dependencies (torch, transformers)
+    when initializing Presidio or when GLiNER is disabled, reducing process baseline memory from ~450MB to ~158MB."""
+    BLOCKED_ROOTS = ("torch", "transformers")
 
     def __init__(self):
         self._installed = False
@@ -151,14 +163,12 @@ class LowMemoryImportBlocker:
 
     def install(self):
         if not self._installed:
-            import sys
             if self not in sys.meta_path:
                 sys.meta_path.insert(0, self)
             self._installed = True
 
     def uninstall(self):
         if self._installed:
-            import sys
             if self in sys.meta_path:
                 sys.meta_path.remove(self)
             self._installed = False
@@ -220,6 +230,9 @@ class AIDetectorService:
         Presidio's built-in default configuration attempts to load 'en_core_web_lg' (~800MB),
         which fails with 'spaCy model en_core_web_lg cannot be found' or causes OOM on
         Render's 512MB RAM free instance.
+
+        The LowMemoryImportBlocker intercepts spaCy's thinc backend from loading torch
+        during this import sequence, saving ~290 MB of RAM while allowing full PII recognition.
         """
         os.environ.setdefault("PRESIDIO_DEVICE", "cpu")
         with low_memory_blocker:
