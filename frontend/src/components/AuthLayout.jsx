@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Shield, ArrowLeft } from 'lucide-react';
 import planetImg from '../assets/planet-security-horizon.jpg';
 import gatewayImg from '../assets/signup-gateway-trail.jpg';
+import CyberBackgroundCanvas from './CyberBackgroundCanvas';
 
 /**
  * Editorial AuthLayout Component
@@ -18,6 +19,9 @@ export default function AuthLayout({
   if (variant === 'centered') {
     return (
       <div className="pg-auth-centered-root">
+        {/* Interactive Particle Constellation */}
+        <CyberBackgroundCanvas nodeCount={25} showCursorAura={true} />
+
         {/* Background Artwork */}
         <div
           className="pg-auth-bg-horizon"
@@ -25,6 +29,7 @@ export default function AuthLayout({
           aria-hidden="true"
         />
         <div className="pg-auth-bg-overlay" aria-hidden="true" />
+        <div className="pg-auth-cyber-mesh" aria-hidden="true" />
 
         {/* Top Branding Header */}
         <header className="pg-auth-top-header">
@@ -61,6 +66,9 @@ export default function AuthLayout({
   // Split variant for Signup (Panel 3)
   return (
     <div className="pg-auth-split-root">
+      {/* Interactive Particle Constellation */}
+      <CyberBackgroundCanvas nodeCount={20} showCursorAura={true} />
+
       {/* Left Column: Form Panel */}
       <div className="pg-auth-split-form-panel">
         <header className="pg-auth-split-header">

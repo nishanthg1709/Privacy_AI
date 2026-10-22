@@ -17,6 +17,8 @@ import Sidebar from './Sidebar';
 import Button from './Button';
 import { useAuth } from '../context/useAuth';
 import planetHorizonImg from '../assets/planet-security-horizon.jpg';
+import cyberMatrixImg from '../assets/cyber-matrix-infra.jpg';
+import CyberBackgroundCanvas from './CyberBackgroundCanvas';
 
 /**
  * Reusable Editorial WorkspaceLayout Component
@@ -84,20 +86,33 @@ export default function WorkspaceLayout({
       <div className="pg-workspace-main">
         {/* Atmospheric Cinematic Workspace Background Stage */}
         <div className="pg-workspace-bg-stage" aria-hidden="true">
-          {/* Layer 1: Ambient Radial Gradients (Slowly Moving Atmospheric Spotlights) */}
+          {/* Layer 0: High-performance interactive particle constellation & cursor glow */}
+          <CyberBackgroundCanvas nodeCount={36} showCursorAura={true} />
+
+          {/* Layer 1: Atmospheric Cyber Infrastructure Matrix Silhouette */}
+          <div
+            className="pg-workspace-matrix-backdrop"
+            style={{ backgroundImage: `url(${cyberMatrixImg})` }}
+          />
+
+          {/* Layer 2: Ambient Radial Gradients (Atmospheric Spotlight Orbs) */}
           <div className="pg-workspace-ambient-light light-primary" />
           <div className="pg-workspace-ambient-light light-secondary" />
+          <div className="pg-workspace-ambient-light light-cyan" />
 
-          {/* Layer 2: Animated Cybernetic Security Mesh Grid */}
+          {/* Layer 3: Animated Cybernetic Security Mesh Grid */}
           <div className="pg-workspace-mesh-grid" />
 
-          {/* Layer 3: Atmospheric Space Horizon Silhouette */}
+          {/* Layer 4: Atmospheric Space Horizon Silhouette */}
           <div
             className="pg-workspace-horizon-silhouette"
             style={{ backgroundImage: `url(${planetHorizonImg})` }}
           />
 
-          {/* Layer 4: Floating Security Data Particles */}
+          {/* Layer 5: Cybernetic scanning radar beam sweep */}
+          <div className="pg-workspace-radar-sweep" />
+
+          {/* Layer 6: Floating Security Data Particles */}
           <div className="pg-workspace-particles">
             <span className="pg-ws-particle p1" />
             <span className="pg-ws-particle p2" />
@@ -107,7 +122,7 @@ export default function WorkspaceLayout({
             <span className="pg-ws-particle p6" />
           </div>
 
-          {/* Layer 5: Subtle Vignette Overlay for Atmospheric Depth */}
+          {/* Layer 7: Subtle Vignette Overlay for Depth */}
           <div className="pg-workspace-vignette" />
         </div>
 

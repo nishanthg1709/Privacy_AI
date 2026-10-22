@@ -13,6 +13,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import Button from '../components/Button';
+import cyberMatrixImg from '../assets/cyber-matrix-infra.jpg';
 
 /**
  * Editorial ScanHistory Page Component
@@ -138,6 +139,13 @@ export default function ScanHistory({
 
   return (
     <div className="pg-editorial-workspace-page">
+      {/* Subtle Cybernetic Layer */}
+      <div
+        className="pg-history-cyber-backdrop"
+        style={{ backgroundImage: `url(${cyberMatrixImg})` }}
+        aria-hidden="true"
+      />
+
       {/* Top Header */}
       <div className="pg-workspace-page-header">
         <div>

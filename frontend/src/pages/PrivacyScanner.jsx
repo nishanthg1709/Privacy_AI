@@ -18,6 +18,7 @@ import {
 import Button from '../components/Button';
 import scannerService from '../services/scannerService';
 import { formatFileSize, validateFile, inspectDecodedText } from '../utils/fileValidation';
+import cyberShieldImg from '../assets/cyber-shield-mesh.jpg';
 
 /**
  * Editorial PrivacyScanner Page Component
@@ -753,19 +754,40 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
                 </div>
               </div>
             ) : (
-              /* IDLE STATE: READY INSPECTOR & ENGINE TELEMETRY */
+              /* IDLE STATE: READY INSPECTOR & ENGINE TELEMETRY WITH 3D CYBER SHIELD */
               <div className="pg-scanner-ready-view">
-                <div className="pg-ready-shield-graphic">
-                  <div className="pg-ready-shield-ring">
-                    <ShieldCheck size={38} className="pg-text-cream" />
+                <div className="pg-scanner-hologram-stage" aria-hidden="true">
+                  <div
+                    className="pg-scanner-hologram-backdrop"
+                    style={{ backgroundImage: `url(${cyberShieldImg})` }}
+                  />
+                  <div className="pg-scanner-radar-orbit">
+                    <span className="pg-orbit-ring r1" />
+                    <span className="pg-orbit-ring r2" />
+                    <span className="pg-orbit-laser-line" />
+                    <div className="pg-hologram-core-icon">
+                      <ShieldCheck size={40} className="pg-text-cream" />
+                    </div>
+                  </div>
+                  <div className="pg-hologram-entity-tags">
+                    <span className="pg-entity-tag t-ssn">SSN</span>
+                    <span className="pg-entity-tag t-email">EMAIL</span>
+                    <span className="pg-entity-tag t-key">API_KEY</span>
+                    <span className="pg-entity-tag t-phi">PHI/HIPAA</span>
                   </div>
                 </div>
 
-                <h3 className="pg-ready-title">Privacy Engine Ready</h3>
-                <p className="pg-ready-description">
-                  Microsoft Presidio and spaCy <code>en_core_web_sm</code> with custom privacy rules
-                  are active in CPU memory (free-tier degraded mode; GLiNER neural AI is disabled to fit within 512MB RAM). No document data is ever sent to external cloud APIs.
-                </p>
+                <div className="pg-scanner-ready-header">
+                  <div className="pg-badge-status-pill pg-mb-xs">
+                    <span className="pg-pulse-dot" />
+                    <span>DEFENSIVE ENGINE ONLINE</span>
+                  </div>
+                  <h3 className="pg-ready-title">Privacy Engine Ready</h3>
+                  <p className="pg-ready-description">
+                    Microsoft Presidio and spaCy <code>en_core_web_sm</code> with deterministic security rules
+                    are active in zero-log memory. No document data or extracted entities are ever sent to external cloud APIs.
+                  </p>
+                </div>
 
                 <div className="pg-ready-metrics-box">
                   <div className="pg-ready-metric-row">
@@ -781,7 +803,7 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
                     <span className="pg-ready-metric-val">40+ PII, Secret &amp; Healthcare</span>
                   </div>
                   <div className="pg-ready-metric-row">
-                    <span className="pg-ready-metric-key">Active Mode</span>
+                    <span className="pg-ready-metric-key">Active Guardrail</span>
                     <span className="pg-ready-metric-val">
                       {privacyMode === 'synthetic'
                         ? 'Synthetic Faker Substitution'
@@ -795,7 +817,7 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
                 </div>
 
                 <div className="pg-ready-footer-tip">
-                  <Cpu size={14} />
+                  <Cpu size={14} className="pg-text-cyan" />
                   <span>Click &ldquo;Scan and Protect&rdquo; to launch live entity detection.</span>
                 </div>
               </div>

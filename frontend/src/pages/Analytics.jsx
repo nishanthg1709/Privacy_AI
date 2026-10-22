@@ -9,6 +9,26 @@ import {
   ArrowRight
 } from 'lucide-react';
 import Button from '../components/Button';
+import useCardTilt from '../hooks/useCardTilt';
+import cyberMatrixImg from '../assets/cyber-matrix-infra.jpg';
+
+function AnalyticsKpiCard({ icon: Icon, label, value, subtext }) {
+  const cardRef = useCardTilt({ maxTilt: 3.5, scale: 1.02 });
+
+  return (
+    <div ref={cardRef} className="pg-analytics-kpi-card">
+      <div className="pg-kpi-glow" aria-hidden="true" />
+      <div className="pg-kpi-icon-wrap">
+        <Icon size={18} />
+      </div>
+      <div className="pg-kpi-meta">
+        <span className="pg-kpi-label">{label}</span>
+        <span className="pg-kpi-value">{value}</span>
+      </div>
+      <span className="pg-kpi-subtext">{subtext}</span>
+    </div>
+  );
+}
 
 /**
  * Editorial Analytics Page
@@ -95,6 +115,13 @@ export default function Analytics({ scanHistory = [], onNavigate, onSelectScan }
 
   return (
     <div className="pg-editorial-workspace-page">
+      {/* Subtle Cybernetic Layer */}
+      <div
+        className="pg-analytics-cyber-backdrop"
+        style={{ backgroundImage: `url(${cyberMatrixImg})` }}
+        aria-hidden="true"
+      />
+
       {/* Top Header */}
       <div className="pg-workspace-page-header">
         <div>
@@ -104,7 +131,7 @@ export default function Analytics({ scanHistory = [], onNavigate, onSelectScan }
           </div>
           <h1 className="pg-workspace-page-title">Privacy Analytics</h1>
           <p className="pg-workspace-page-subtitle">
-            Monochrome telemetry derived strictly from authenticated scan executions.
+            Telemetry metrics and mitigation distributions derived strictly from authenticated scan executions.
           </p>
         </div>
 
@@ -124,40 +151,26 @@ export default function Analytics({ scanHistory = [], onNavigate, onSelectScan }
         </div>
       </div>
 
-      {/* KPI Cards Row (Matching Reference Panel 8) */}
+      {/* KPI Cards Row (Enhanced with 3D Tilt and Specular Highlight) */}
       <div className="pg-analytics-kpi-grid">
-        <div className="pg-analytics-kpi-card">
-          <div className="pg-kpi-icon-wrap">
-            <Scan size={18} />
-          </div>
-          <div className="pg-kpi-meta">
-            <span className="pg-kpi-label">Total Scans</span>
-            <span className="pg-kpi-value">{totalScans}</span>
-          </div>
-          <span className="pg-kpi-subtext">Verified pipeline executions</span>
-        </div>
-
-        <div className="pg-analytics-kpi-card">
-          <div className="pg-kpi-icon-wrap">
-            <ShieldCheck size={18} />
-          </div>
-          <div className="pg-kpi-meta">
-            <span className="pg-kpi-label">Sensitive Items</span>
-            <span className="pg-kpi-value">{totalSensitiveEntities}</span>
-          </div>
-          <span className="pg-kpi-subtext">Identified across all scans</span>
-        </div>
-
-        <div className="pg-analytics-kpi-card">
-          <div className="pg-kpi-icon-wrap">
-            <CheckCircle2 size={18} />
-          </div>
-          <div className="pg-kpi-meta">
-            <span className="pg-kpi-label">Redacted Items</span>
-            <span className="pg-kpi-value">{totalRedactedEntities}</span>
-          </div>
-          <span className="pg-kpi-subtext">Transformed &amp; secured tokens</span>
-        </div>
+        <AnalyticsKpiCard
+          icon={Scan}
+          label="Total Scans"
+          value={totalScans}
+          subtext="Verified pipeline executions"
+        />
+        <AnalyticsKpiCard
+          icon={ShieldCheck}
+          label="Sensitive Items"
+          value={totalSensitiveEntities}
+          subtext="Identified across all scans"
+        />
+        <AnalyticsKpiCard
+          icon={CheckCircle2}
+          label="Redacted Items"
+          value={totalRedactedEntities}
+          subtext="Transformed &amp; secured tokens"
+        />
       </div>
 
       {totalScans === 0 ? (

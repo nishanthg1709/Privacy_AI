@@ -13,6 +13,20 @@ import {
   Info
 } from 'lucide-react';
 import Button from '../components/Button';
+import { useCardTilt } from '../hooks/useCardTilt';
+
+function ResultsKpiCard({ count, title, subtitle }) {
+  const cardRef = useCardTilt({ maxTilt: 6, scale: 1.02 });
+  return (
+    <div ref={cardRef} className="pg-results-kpi-card pg-cyber-card-tilt pg-specular-card">
+      <div className="pg-kpi-num-badge">{count}</div>
+      <div className="pg-kpi-info">
+        <span className="pg-kpi-title">{title}</span>
+        <span className="pg-kpi-sub">{subtitle}</span>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Editorial Results Page Component
@@ -271,37 +285,26 @@ export default function Results({ onNavigate, scanData: propScanData }) {
 
       {/* Detection Summary KPI Row (Matching Reference Panel 6) */}
       <div className="pg-results-kpi-grid">
-        <div className="pg-results-kpi-card">
-          <div className="pg-kpi-num-badge">{payload.findingsCount}</div>
-          <div className="pg-kpi-info">
-            <span className="pg-kpi-title">Sensitive Items</span>
-            <span className="pg-kpi-sub">Detected entities</span>
-          </div>
-        </div>
-
-        <div className="pg-results-kpi-card">
-          <div className="pg-kpi-num-badge">{payload.categories.length || Object.keys(categoryGroups).length}</div>
-          <div className="pg-kpi-info">
-            <span className="pg-kpi-title">Entity Categories</span>
-            <span className="pg-kpi-sub">Classified types</span>
-          </div>
-        </div>
-
-        <div className="pg-results-kpi-card">
-          <div className="pg-kpi-num-badge">{redactedCount}</div>
-          <div className="pg-kpi-info">
-            <span className="pg-kpi-title">Redacted Items</span>
-            <span className="pg-kpi-sub">Protected in output</span>
-          </div>
-        </div>
-
-        <div className="pg-results-kpi-card">
-          <div className="pg-kpi-num-badge">{highRiskCount}</div>
-          <div className="pg-kpi-info">
-            <span className="pg-kpi-title">High Risk Items</span>
-            <span className="pg-kpi-sub">Critical violations</span>
-          </div>
-        </div>
+        <ResultsKpiCard
+          count={payload.findingsCount}
+          title="Sensitive Items"
+          subtitle="Detected entities"
+        />
+        <ResultsKpiCard
+          count={payload.categories.length || Object.keys(categoryGroups).length}
+          title="Entity Categories"
+          subtitle="Classified types"
+        />
+        <ResultsKpiCard
+          count={redactedCount}
+          title="Redacted Items"
+          subtitle="Protected in output"
+        />
+        <ResultsKpiCard
+          count={highRiskCount}
+          title="High Risk Items"
+          subtitle="Critical violations"
+        />
       </div>
 
       {/* TAB 1: SUMMARY (Split Layout: Detected Entities + Protected Output) */}

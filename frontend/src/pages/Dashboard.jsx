@@ -10,11 +10,44 @@ import {
   Settings,
   ChevronRight,
   Terminal,
-  FileText
+  FileText,
+  Activity
 } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import Button from '../components/Button';
+import useCardTilt from '../hooks/useCardTilt';
 import dashboardTechImg from '../assets/dashboard-workspace-tech.jpg';
+import cyberMatrixImg from '../assets/cyber-matrix-infra.jpg';
+
+function ActionCard({ icon: Icon, title, desc, onClick }) {
+  const cardRef = useCardTilt({ maxTilt: 3.8, scale: 1.02 });
+
+  return (
+    <div
+      ref={cardRef}
+      className="pg-action-card"
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
+      <div className="pg-action-card-glow" aria-hidden="true" />
+      <div className="pg-action-card-icon">
+        <Icon size={20} />
+      </div>
+      <div className="pg-action-card-text">
+        <h3 className="pg-action-card-title">{title}</h3>
+        <p className="pg-action-card-desc">{desc}</p>
+      </div>
+      <ChevronRight size={16} className="pg-action-card-arrow" />
+    </div>
+  );
+}
 
 /**
  * Editorial Dashboard Page
@@ -69,11 +102,22 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
     <div className="pg-editorial-workspace-page">
       {/* Welcome Hero Area (Matching Reference Panel 4) */}
       <section className="pg-workspace-hero-panel" aria-label="Privacy Workspace Welcome">
+        <div
+          className="pg-hero-cyber-mesh-backdrop"
+          style={{ backgroundImage: `url(${cyberMatrixImg})` }}
+          aria-hidden="true"
+        />
+
         <div className="pg-workspace-hero-body">
+          <div className="pg-eyebrow-reference pg-mb-xs">
+            <span className="pg-eyebrow-dot" />
+            <span>AI ENCLAVE DEFENSE • ACTIVE RECOGNITION</span>
+          </div>
+
           <span className="pg-workspace-greeting">Welcome Back,</span>
           <h1 className="pg-workspace-heading">Your Workspace</h1>
           <p className="pg-workspace-subheading">
-            Scan, protect, and review your documents with privacy in mind.
+            Scan, sanitize, and verify your documents with deterministic zero-exposure guardrails.
           </p>
 
           <div className="pg-hero-actions-row">
@@ -101,79 +145,49 @@ export default function Dashboard({ onNavigate, onSelectScan, scanHistory = [], 
 
         <div className="pg-workspace-hero-graphic">
           <div className="pg-workspace-graphic-glow" aria-hidden="true" />
+          <div className="pg-hero-radar-rings" aria-hidden="true">
+            <span className="pg-radar-ring ring-1" />
+            <span className="pg-radar-ring ring-2" />
+            <span className="pg-radar-crosshair" />
+          </div>
           <img
             src={dashboardTechImg}
             alt="Monochrome security workstation with protected documents"
             className="pg-workspace-laptop-img"
           />
+          <div className="pg-hero-cyber-badge">
+            <Activity size={13} className="pg-text-cyan pg-anim-pulse" />
+            <span>ZERO-LOG ENCLAVE ACTIVE</span>
+          </div>
         </div>
       </section>
 
-      {/* 4 Workspace Action Cards (Matching Reference Panel 4) */}
+      {/* 4 Workspace Action Cards (Enhanced with 3D Tilt and Specular Highlight) */}
       <section className="pg-workspace-action-cards-grid" aria-label="Workspace Actions">
-        <div
-          className="pg-action-card"
+        <ActionCard
+          icon={Scan}
+          title="New Scan"
+          desc="Scan a document or paste sensitive text"
           onClick={() => handleGo('scanner')}
-          role="button"
-          tabIndex={0}
-        >
-          <div className="pg-action-card-icon">
-            <Scan size={20} />
-          </div>
-          <div className="pg-action-card-text">
-            <h3 className="pg-action-card-title">New Scan</h3>
-            <p className="pg-action-card-desc">Scan a document or paste text</p>
-          </div>
-          <ChevronRight size={16} className="pg-action-card-arrow" />
-        </div>
-
-        <div
-          className="pg-action-card"
+        />
+        <ActionCard
+          icon={History}
+          title="Scan History"
+          desc="View auditable zero-log scan telemetry"
           onClick={() => handleGo('history')}
-          role="button"
-          tabIndex={0}
-        >
-          <div className="pg-action-card-icon">
-            <History size={20} />
-          </div>
-          <div className="pg-action-card-text">
-            <h3 className="pg-action-card-title">Scan History</h3>
-            <p className="pg-action-card-desc">View your scan history</p>
-          </div>
-          <ChevronRight size={16} className="pg-action-card-arrow" />
-        </div>
-
-        <div
-          className="pg-action-card"
+        />
+        <ActionCard
+          icon={BarChart3}
+          title="Analytics"
+          desc="Track mitigation telemetry and insights"
           onClick={() => handleGo('analytics')}
-          role="button"
-          tabIndex={0}
-        >
-          <div className="pg-action-card-icon">
-            <BarChart3 size={20} />
-          </div>
-          <div className="pg-action-card-text">
-            <h3 className="pg-action-card-title">Analytics</h3>
-            <p className="pg-action-card-desc">Track your usage and insights</p>
-          </div>
-          <ChevronRight size={16} className="pg-action-card-arrow" />
-        </div>
-
-        <div
-          className="pg-action-card"
+        />
+        <ActionCard
+          icon={Settings}
+          title="Settings"
+          desc="Manage security and display preferences"
           onClick={() => handleGo('settings')}
-          role="button"
-          tabIndex={0}
-        >
-          <div className="pg-action-card-icon">
-            <Settings size={20} />
-          </div>
-          <div className="pg-action-card-text">
-            <h3 className="pg-action-card-title">Settings</h3>
-            <p className="pg-action-card-desc">Manage your preferences</p>
-          </div>
-          <ChevronRight size={16} className="pg-action-card-arrow" />
-        </div>
+        />
       </section>
 
       {/* Real Statistics Section */}

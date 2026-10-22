@@ -1,4 +1,5 @@
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import useCardTilt from '../hooks/useCardTilt';
 
 /**
  * Editorial StatCard Component
@@ -15,8 +16,11 @@ export default function StatCard({
   tag,
   onClick,
 }) {
+  const cardRef = useCardTilt({ maxTilt: 3.5, scale: 1.018 });
+
   return (
     <div
+      ref={cardRef}
       className={`pg-editorial-stat-card ${onClick ? 'pg-stat-card-clickable' : ''}`}
       onClick={onClick}
       role={onClick ? 'button' : 'region'}

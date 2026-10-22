@@ -1408,12 +1408,35 @@
 }
 
 /* Atmospheric Workspace Cinematic Background Stage */
+.pg-cyber-bg-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .pg-workspace-bg-stage {
-  position: absolute;
+  position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
   overflow: hidden;
+}
+
+.pg-workspace-matrix-backdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 25%;
+  opacity: 0.16;
+  filter: grayscale(90%) contrast(125%) brightness(0.65);
+  mask-image: radial-gradient(ellipse 95% 85% at 50% 30%, black 45%, transparent 95%);
+  -webkit-mask-image: radial-gradient(ellipse 95% 85% at 50% 30%, black 45%, transparent 95%);
+  pointer-events: none;
+  animation: matrixBreathe 28s ease-in-out infinite alternate;
+  will-change: transform, opacity;
 }
 
 .pg-workspace-ambient-light {
@@ -1440,6 +1463,27 @@
   height: 520px;
   background: radial-gradient(circle, rgba(245, 243, 238, 0.05) 0%, rgba(245, 243, 238, 0.015) 50%, transparent 75%);
   animation: wsAmbientDrift2 30s ease-in-out infinite alternate;
+}
+
+.pg-workspace-ambient-light.light-cyan {
+  top: 55%;
+  right: 12%;
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.045) 0%, rgba(0, 229, 255, 0.01) 50%, transparent 75%);
+  animation: wsAmbientDrift1 26s ease-in-out infinite alternate;
+}
+
+.pg-workspace-radar-sweep {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(0, 229, 255, 0.28) 50%, transparent 100%);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.35);
+  pointer-events: none;
+  animation: radarSweepVertical 16s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .pg-workspace-mesh-grid {
@@ -6540,6 +6584,445 @@
   }
 }
 
+/* ==========================================================================
+   CYBERNETIC MOTION & INTERACTION ENHANCEMENTS (AI CYBERSECURITY THEME)
+   ========================================================================== */
+
+/* Keyframe Animations */
+@keyframes matrixBreathe {
+  0% { transform: scale(1) translateY(0); opacity: 0.14; }
+  50% { transform: scale(1.025) translateY(-6px); opacity: 0.20; }
+  100% { transform: scale(1) translateY(0); opacity: 0.14; }
+}
+
+@keyframes radarSweepVertical {
+  0% { transform: translateY(-10px); opacity: 0; }
+  5% { opacity: 0.75; }
+  95% { opacity: 0.75; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+@keyframes radarSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes radarSpinReverse {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes hologramPulse {
+  0% { opacity: 0.38; transform: scale(1); }
+  100% { opacity: 0.60; transform: scale(1.03); }
+}
+
+@keyframes laserScanUpDown {
+  0% { top: 8%; opacity: 0.4; }
+  50% { opacity: 0.9; }
+  100% { top: 92%; opacity: 0.4; }
+}
+
+@keyframes tagFloat1 {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-4px); }
+}
+
+@keyframes tagFloat2 {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(4px); }
+}
+
+@keyframes pulseCyan {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.8)); }
+}
+
+@keyframes dropzoneScan {
+  0% { background-position: 0 0; }
+  100% { background-position: 40px 40px; }
+}
+
+/* Card 3D Tilt & Specular Rim Light System */
+.pg-editorial-stat-card,
+.pg-action-card,
+.pg-analytics-kpi-card,
+.pg-visualizer-card {
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.28s ease, border-color 0.25s ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.pg-editorial-stat-card.pg-tilt-active,
+.pg-action-card.pg-tilt-active,
+.pg-analytics-kpi-card.pg-tilt-active {
+  transform: perspective(1000px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) scale3d(var(--tilt-scale, 1), var(--tilt-scale, 1), var(--tilt-scale, 1));
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 229, 255, 0.08);
+  border-color: rgba(0, 229, 255, 0.28);
+}
+
+/* Specular border reflection following cursor coordinates */
+.pg-editorial-stat-card::before,
+.pg-action-card::before,
+.pg-analytics-kpi-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: radial-gradient(circle 140px at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.16), transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+}
+
+.pg-editorial-stat-card:hover::before,
+.pg-action-card:hover::before,
+.pg-analytics-kpi-card:hover::before {
+  opacity: 1;
+}
+
+/* Dashboard Action Card Enhancements */
+.pg-action-card {
+  position: relative;
+  overflow: hidden;
+  background: rgba(14, 16, 22, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(245, 243, 238, 0.08);
+}
+
+.pg-action-card-glow {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.12) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.pg-action-card:hover .pg-action-card-glow {
+  opacity: 1;
+}
+
+.pg-action-card:hover .pg-action-card-icon {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: rgba(0, 229, 255, 0.35);
+  color: #00e5ff;
+  transform: scale(1.08);
+}
+
+.pg-action-card:hover .pg-action-card-arrow {
+  color: #00e5ff;
+  transform: translateX(4px);
+}
+
+/* Dashboard Hero Radar & Cyber Mesh */
+.pg-hero-cyber-mesh-backdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center center;
+  opacity: 0.14;
+  filter: grayscale(100%) contrast(120%) brightness(0.65);
+  mask-image: linear-gradient(to right, transparent 0%, black 35%, black 75%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 35%, black 75%, transparent 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pg-hero-radar-rings {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 280px;
+  height: 280px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pg-radar-ring {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.pg-radar-ring.ring-1 {
+  inset: 0;
+  border: 1px dashed rgba(0, 229, 255, 0.22);
+  animation: radarSpin 22s linear infinite;
+}
+
+.pg-radar-ring.ring-2 {
+  inset: 28px;
+  border: 1px dotted rgba(245, 243, 238, 0.16);
+  animation: radarSpinReverse 16s linear infinite;
+}
+
+.pg-radar-crosshair {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(0, 229, 255, 0.09) 1px, transparent 1px) center / 100% 1px no-repeat,
+    linear-gradient(90deg, rgba(0, 229, 255, 0.09) 1px, transparent 1px) center / 1px 100% no-repeat;
+}
+
+.pg-hero-cyber-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  background: rgba(8, 10, 14, 0.92);
+  border: 1px solid rgba(0, 229, 255, 0.32);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6), 0 0 14px rgba(0, 229, 255, 0.16);
+  font-family: var(--pg-font-mono, monospace);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--pg-cream-200);
+  z-index: 5;
+  white-space: nowrap;
+}
+
+/* Scanner 3D Cyber Shield Hologram Stage */
+.pg-scanner-hologram-stage {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  margin-bottom: 20px;
+  border-radius: var(--pg-radius-sm);
+  background: radial-gradient(circle at 50% 50%, rgba(15, 20, 28, 0.75) 0%, rgba(5, 7, 10, 0.95) 100%);
+  border: 1px solid rgba(0, 229, 255, 0.16);
+  box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.85), 0 0 24px rgba(0, 229, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pg-scanner-hologram-backdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center center;
+  opacity: 0.45;
+  filter: contrast(125%) brightness(0.9);
+  mask-image: radial-gradient(circle at 50% 50%, black 50%, transparent 82%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, black 50%, transparent 82%);
+  animation: hologramPulse 8s ease-in-out infinite alternate;
+}
+
+.pg-scanner-radar-orbit {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.pg-orbit-ring {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.pg-orbit-ring.r1 {
+  inset: 0;
+  border: 1px dashed rgba(0, 229, 255, 0.38);
+  animation: radarSpin 24s linear infinite;
+}
+
+.pg-orbit-ring.r2 {
+  inset: 18px;
+  border: 1px dotted rgba(245, 243, 238, 0.24);
+  animation: radarSpinReverse 18s linear infinite;
+}
+
+.pg-orbit-laser-line {
+  position: absolute;
+  width: 100%;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.7), transparent);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+  animation: laserScanUpDown 4.5s ease-in-out infinite alternate;
+}
+
+.pg-hologram-core-icon {
+  position: relative;
+  z-index: 3;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: rgba(8, 12, 18, 0.88);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  box-shadow: 0 0 22px rgba(0, 229, 255, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pg-hologram-entity-tags {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.pg-entity-tag {
+  position: absolute;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(6, 9, 14, 0.88);
+  border: 1px solid rgba(0, 229, 255, 0.32);
+  font-family: var(--pg-font-mono, monospace);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--pg-cream-200);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.16);
+}
+
+.pg-entity-tag.t-ssn { top: 20px; left: 24px; animation: tagFloat1 6s ease-in-out infinite alternate; }
+.pg-entity-tag.t-email { top: 20px; right: 24px; animation: tagFloat2 7s ease-in-out infinite alternate; }
+.pg-entity-tag.t-key { bottom: 20px; left: 24px; animation: tagFloat2 6.5s ease-in-out infinite alternate; }
+.pg-entity-tag.t-phi { bottom: 20px; right: 24px; animation: tagFloat1 8s ease-in-out infinite alternate; }
+
+/* Enhanced File Dropzone with Interactive Laser Border */
+.pg-dropzone-editorial {
+  position: relative;
+  border: 1.5px dashed rgba(245, 243, 238, 0.18);
+  border-radius: var(--pg-radius-sm);
+  background: rgba(10, 12, 16, 0.6);
+  padding: 38px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+
+.pg-dropzone-editorial:hover,
+.pg-dropzone-editorial.pg-dropzone-active {
+  border-color: #00e5ff;
+  background: rgba(0, 229, 255, 0.035);
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.12), inset 0 0 18px rgba(0, 229, 255, 0.04);
+  transform: translateY(-1px);
+}
+
+.pg-dropzone-editorial:hover .pg-drop-icon {
+  color: #00e5ff;
+  transform: translateY(-2px);
+}
+
+.pg-drop-icon {
+  transition: transform 0.25s ease, color 0.25s ease;
+  color: var(--pg-cream-300);
+}
+
+/* Analytics & History Cybernetic Backdrops */
+.pg-analytics-cyber-backdrop,
+.pg-history-cyber-backdrop {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center 25%;
+  opacity: 0.09;
+  filter: grayscale(90%) contrast(120%) brightness(0.6);
+  mask-image: radial-gradient(ellipse 95% 85% at 50% 30%, black 40%, transparent 95%);
+  -webkit-mask-image: radial-gradient(ellipse 95% 85% at 50% 30%, black 40%, transparent 95%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pg-auth-cyber-mesh {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(circle at 50% 40%, black 40%, transparent 90%);
+  -webkit-mask-image: radial-gradient(circle at 50% 40%, black 40%, transparent 90%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Analytics KPI Glow & Charts Interactive Elevate */
+.pg-analytics-kpi-card {
+  position: relative;
+  overflow: hidden;
+  background: rgba(14, 16, 22, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(245, 243, 238, 0.08);
+}
+
+.pg-kpi-glow {
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.1) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.pg-analytics-kpi-card:hover .pg-kpi-glow {
+  opacity: 1;
+}
+
+.pg-bar-col {
+  transition: transform 0.22s ease;
+}
+
+.pg-bar-col:hover {
+  transform: translateY(-3px);
+}
+
+.pg-bar-col:hover .pg-bar-fill {
+  background: linear-gradient(180deg, #00e5ff 0%, #F5F3EE 100%);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+}
+
+/* Button Micro-Animations & Glow */
+.pg-btn {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.22s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.pg-btn:hover {
+  transform: translateY(-1.5px);
+}
+
+.pg-btn:active {
+  transform: translateY(0.5px) scale(0.985);
+}
+
+.pg-btn-primary:hover {
+  box-shadow: 0 4px 18px rgba(245, 243, 238, 0.2), 0 0 14px rgba(0, 229, 255, 0.28);
+}
+
+.pg-text-cyan {
+  color: #00e5ff !important;
+}
+
+.pg-anim-pulse {
+  animation: pulseCyan 2s ease-in-out infinite;
+}
+
 /* Accessibility: Respect prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -6554,15 +7037,29 @@
   .pg-workspace-mesh-grid,
   .pg-workspace-horizon-silhouette,
   .pg-workspace-ambient-light,
+  .pg-workspace-matrix-backdrop,
+  .pg-workspace-radar-sweep,
   .pg-ws-particle,
   .pg-workspace-laptop-img,
   .pg-workspace-graphic-glow,
   .pg-workspace-hero-panel,
   .pg-action-card,
+  .pg-radar-ring,
+  .pg-orbit-laser-line,
+  .pg-scanner-hologram-backdrop,
+  .pg-entity-tag,
+  .pg-anim-pulse,
   .pg-anim-dashboard-telemetry,
   .pg-anim-dashboard-activity {
     animation: none !important;
     transform: none !important;
+  }
+
+  .pg-editorial-stat-card,
+  .pg-action-card,
+  .pg-analytics-kpi-card {
+    transform: none !important;
+    transition: none !important;
   }
 }
 
