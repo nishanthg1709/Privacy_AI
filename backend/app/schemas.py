@@ -59,6 +59,7 @@ class ScanRequest(BaseModel):
     task: Optional[str] = Field("Prompt Privacy Audit", max_length=200, description="Task context or audit description")
     privacy_mode: Optional[str] = Field("strict", description="Privacy mode: 'strict', 'task-aware', 'user-approved', 'synthetic', 'tokenized', 'redaction'")
     strictness: Optional[str] = Field("gdpr-hipaa", description="Compliance strictness: 'gdpr-hipaa', 'standard', 'secrets-only'")
+    request_id: Optional[str] = Field(None, max_length=120, description="Optional client idempotency identifier")
 
     @field_validator("text")
     @classmethod

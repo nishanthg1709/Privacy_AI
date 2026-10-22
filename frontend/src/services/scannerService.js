@@ -134,13 +134,19 @@ export async function scanPayload({
   }
 
   const endpoint = `${baseUrl}/api/scan`;
-  const timeoutMs = 20000;
+  const envTimeout =
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SCAN_TIMEOUT_MS) ||
+    (typeof globalThis !== 'undefined' && globalThis.process?.env?.VITE_SCAN_TIMEOUT_MS);
+  const timeoutMs = Number(envTimeout) > 0 ? Number(envTimeout) : 60000;
+
+  const requestId = `REQ-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
   const payload = {
     text: text.trim(),
     task: task?.trim() || 'Prompt Privacy Audit',
     privacy_mode: privacy_mode || 'synthetic',
     strictness,
+    request_id: requestId,
   };
 
   let response;
@@ -162,7 +168,7 @@ export async function scanPayload({
       });
       clearTimeout(timeoutId);
 
-      // Retry on transient server errors (502/503/504)
+      // Retry on transient server gateway errors (502/503/504)
       if (!response.ok && [502, 503, 504].includes(response.status) && attempt < attempts) {
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
         continue;
@@ -171,17 +177,21 @@ export async function scanPayload({
       break;
     } catch (err) {
       clearTimeout(timeoutId);
+
+      // Never retry non-idempotent scans on client timeout (AbortError) to avoid overloading backend
+      if (err.name === 'AbortError') {
+        throw new Error(
+          `Scan request timed out after ${timeoutMs / 1000}s. The backend may be busy or processing a large document. Please retry or scan smaller text chunks.`,
+          { cause: err }
+        );
+      }
+
+      // Retry transient network errors if attempts remain
       if (attempt < attempts) {
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
         continue;
       }
 
-      if (err.name === 'AbortError') {
-        throw new Error(
-          `Scan request timed out after ${timeoutMs / 1000}s. The backend may be busy or experiencing high latency.`,
-          { cause: err }
-        );
-      }
       // Network failure / Connection refused
       const hostInfo = baseUrl ? ` at ${baseUrl}` : '';
       throw new Error(

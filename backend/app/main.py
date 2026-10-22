@@ -42,8 +42,9 @@ AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "urchade/gliner_small-v2.1")
 AI_DEVICE = os.getenv("AI_DEVICE", "cpu")
 AI_CONFIDENCE_THRESHOLD = float(os.getenv("AI_CONFIDENCE_THRESHOLD", "0.40"))
 ENABLE_PRESIDIO = os.getenv("ENABLE_PRESIDIO", "true").lower() in ("true", "1", "yes")
-ENABLE_GLINER = os.getenv("ENABLE_GLINER", "true").lower() in ("true", "1", "yes")
+ENABLE_GLINER = os.getenv("ENABLE_GLINER", "false").lower() in ("true", "1", "yes")
 SPACY_MODEL = os.getenv("SPACY_MODEL", "en_core_web_sm")
+os.environ.setdefault("PRESIDIO_DEVICE", "cpu")
 MAX_PAYLOAD_CHARS = int(os.getenv("MAX_PAYLOAD_CHARS", "100000"))
 
 
@@ -189,6 +190,15 @@ async def get_engine_status() -> EngineStatus:
     )
 
 
+# Concurrency lock and bounded idempotency cache for 512MB RAM environment
+import asyncio
+from collections import OrderedDict
+
+_scan_lock = asyncio.Lock()
+_idempotency_cache: OrderedDict[str, ScanResponse] = OrderedDict()
+_MAX_IDEMPOTENCY_CACHE = 32
+
+
 @app.post("/api/scan", response_model=ScanResponse, tags=["Scanner"])
 async def scan_payload(payload: ScanRequest) -> ScanResponse:
     """Scan document text, detect sensitive context, redact according to mode, and verify.
@@ -198,6 +208,7 @@ async def scan_payload(payload: ScanRequest) -> ScanResponse:
     - task: task description / context label
     - privacy_mode: 'strict', 'task-aware', 'user-approved', 'synthetic', 'tokenized', 'redaction'
     - strictness: 'gdpr-hipaa', 'standard', 'secrets-only'
+    - request_id: optional client-provided idempotency key
 
     Returns:
     - scan_id, protected_text, findings, summary, privacy_mode, engine_status, verification
@@ -209,14 +220,30 @@ async def scan_payload(payload: ScanRequest) -> ScanResponse:
             detail=f"Payload exceeds maximum allowed size of {MAX_PAYLOAD_CHARS} characters.",
         )
 
+    # Check idempotency cache first
+    if payload.request_id and payload.request_id in _idempotency_cache:
+        logger.info("Returning cached scan response for request_id=%s", payload.request_id)
+        return _idempotency_cache[payload.request_id]
+
     try:
-        response = privacy_engine.process_scan(
-            text=payload.text,
-            task=payload.task or "Prompt Privacy Audit",
-            privacy_mode=payload.privacy_mode or "strict",
-            strictness=payload.strictness or "gdpr-hipaa",
-        )
-        return response
+        # Sequential processing lock to prevent memory spikes on Render 512MB instance
+        async with _scan_lock:
+            if payload.request_id and payload.request_id in _idempotency_cache:
+                return _idempotency_cache[payload.request_id]
+
+            response = privacy_engine.process_scan(
+                text=payload.text,
+                task=payload.task or "Prompt Privacy Audit",
+                privacy_mode=payload.privacy_mode or "strict",
+                strictness=payload.strictness or "gdpr-hipaa",
+            )
+
+            if payload.request_id:
+                _idempotency_cache[payload.request_id] = response
+                if len(_idempotency_cache) > _MAX_IDEMPOTENCY_CACHE:
+                    _idempotency_cache.popitem(last=False)
+
+            return response
     except Exception as e:
         logger.error("Scan processing failure: %s", str(e), exc_info=True)
         raise HTTPException(

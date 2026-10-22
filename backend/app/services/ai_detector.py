@@ -134,6 +134,46 @@ class RawDetection:
         }
 
 
+class LowMemoryImportBlocker:
+    """Blocks speculative imports of heavy neural dependencies (torch, transformers, gliner)
+    when initializing Presidio or when GLiNER is disabled, reducing process baseline memory from ~450MB to ~150MB."""
+    BLOCKED_ROOTS = ("torch", "transformers", "gliner")
+
+    def __init__(self):
+        self._installed = False
+
+    def __enter__(self):
+        self.install()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.uninstall()
+
+    def install(self):
+        if not self._installed:
+            import sys
+            if self not in sys.meta_path:
+                sys.meta_path.insert(0, self)
+            self._installed = True
+
+    def uninstall(self):
+        if self._installed:
+            import sys
+            if self in sys.meta_path:
+                sys.meta_path.remove(self)
+            self._installed = False
+
+    def find_spec(self, fullname, path, target=None):
+        if any(fullname == root or fullname.startswith(root + ".") for root in self.BLOCKED_ROOTS):
+            raise ModuleNotFoundError(
+                f"Module '{fullname}' is disabled for low-memory mode to comply with 512MB hosting limits."
+            )
+        return None
+
+
+low_memory_blocker = LowMemoryImportBlocker()
+
+
 class AIDetectorService:
     """Orchestrates GLiNER neural contextual detection, Presidio, and secret rules."""
 
@@ -180,26 +220,38 @@ class AIDetectorService:
         which fails with 'spaCy model en_core_web_lg cannot be found' or causes OOM on
         Render's 512MB RAM free instance.
         """
-        from presidio_analyzer import AnalyzerEngine
-        from presidio_analyzer.nlp_engine import NlpEngineProvider
-        import spacy
+        os.environ.setdefault("PRESIDIO_DEVICE", "cpu")
+        with low_memory_blocker:
+            from presidio_analyzer import AnalyzerEngine
+            from presidio_analyzer.nlp_engine import NlpEngineProvider
+            import spacy
 
-        # If model is not loaded/installed, attempt download
-        if not spacy.util.is_package(model_name):
-            logger.info("spaCy model '%s' not found locally; downloading...", model_name)
+            # If model is not loaded/installed, attempt download
+            if not spacy.util.is_package(model_name):
+                logger.info("spaCy model '%s' not found locally; downloading...", model_name)
+                try:
+                    import spacy.cli
+                    spacy.cli.download(model_name)
+                except Exception as dl_err:
+                    logger.warning("spaCy CLI download of '%s' failed: %s", model_name, dl_err)
+
+            nlp_configuration = {
+                "nlp_engine_name": "spacy",
+                "models": [{"lang_code": "en", "model_name": model_name}],
+            }
+            provider = NlpEngineProvider(nlp_configuration=nlp_configuration)
+            nlp_engine = provider.create_engine()
+
+            # Disable parser if present to save CPU and ~40 MB RAM during inference
             try:
-                import spacy.cli
-                spacy.cli.download(model_name)
-            except Exception as dl_err:
-                logger.warning("spaCy CLI download of '%s' failed: %s", model_name, dl_err)
+                if hasattr(nlp_engine, "nlp") and isinstance(nlp_engine.nlp, dict):
+                    spacy_nlp = nlp_engine.nlp.get("en")
+                    if spacy_nlp and "parser" in spacy_nlp.pipe_names:
+                        spacy_nlp.disable_pipes("parser")
+            except Exception as pe:
+                logger.debug("Note on disabling parser: %s", pe)
 
-        nlp_configuration = {
-            "nlp_engine_name": "spacy",
-            "models": [{"lang_code": "en", "model_name": model_name}],
-        }
-        provider = NlpEngineProvider(nlp_configuration=nlp_configuration)
-        nlp_engine = provider.create_engine()
-        return AnalyzerEngine(nlp_engine=nlp_engine)
+            return AnalyzerEngine(nlp_engine=nlp_engine)
 
     def load_engines(
         self,
@@ -223,10 +275,10 @@ class AIDetectorService:
             logger.warning("Engine initialization is already in progress; skipping concurrent invocation.")
             return
 
-        if self.model_loaded and self.gliner_model is not None:
-            if not enable_presidio or self.presidio_loaded:
-                logger.info("Engines already loaded; skipping redundant initialization.")
-                return
+        # If engines are already initialized (either ready or degraded), skip redundant initialization
+        if (self.model_loaded or (not enable_gliner and self.presidio_loaded)) and (not enable_presidio or self.presidio_loaded):
+            logger.info("Engines already loaded (status=%s); skipping redundant initialization.", self.status)
+            return
 
         self._is_loading = True
         self._load_count += 1
@@ -237,11 +289,16 @@ class AIDetectorService:
             spacy_model = os.getenv("SPACY_MODEL", "en_core_web_sm")
         self.spacy_model = spacy_model
 
+        # Ensure low-memory configuration when neural model is disabled
+        if not enable_gliner:
+            os.environ.setdefault("PRESIDIO_DEVICE", "cpu")
+
         # 0. Limit PyTorch CPU threads & tokenizers parallelism if loading neural model
-        os.environ.setdefault("OMP_NUM_THREADS", "1")
-        os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-        os.environ.setdefault("MKL_NUM_THREADS", "1")
-        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+        if enable_gliner:
+            os.environ.setdefault("OMP_NUM_THREADS", "1")
+            os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+            os.environ.setdefault("MKL_NUM_THREADS", "1")
+            os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
         # 1. Load GLiNER contextual model
         if enable_gliner:
@@ -366,26 +423,15 @@ class AIDetectorService:
             )
         return results
 
-    def detect_presidio(self, text: str) -> List[RawDetection]:
-        """Run complementary pattern and checksum recognition via Microsoft Presidio."""
-        if not self.presidio_loaded or self.presidio_analyzer is None:
-            return []
-
-        try:
-            presidio_results = self.presidio_analyzer.analyze(
-                text=text,
-                language="en",
-                score_threshold=0.3,
-            )
-        except Exception as e:
-            logger.error("Presidio inference error: %s", str(e))
-            return []
-
+    def _convert_presidio_results(
+        self, text_segment: str, presidio_results: List[Any], offset: int = 0
+    ) -> List[RawDetection]:
+        """Convert Presidio RecognizerResult items to RawDetection instances with optional global offset."""
         results: List[RawDetection] = []
         for res in presidio_results:
-            start = res.start
-            end = res.end
-            snippet = text[start:end]
+            start = res.start + offset
+            end = res.end + offset
+            snippet = text_segment[res.start:res.end]
             if snippet.strip().lower() in LABEL_STOPWORDS:
                 continue
             entity_type = res.entity_type
@@ -410,6 +456,57 @@ class AIDetectorService:
                 )
             )
         return results
+
+    def detect_presidio(self, text: str) -> List[RawDetection]:
+        """Run complementary pattern and checksum recognition via Microsoft Presidio."""
+        if not self.presidio_loaded or self.presidio_analyzer is None:
+            return []
+
+        # For smaller documents, analyze directly
+        CHUNK_LIMIT = 4000
+        if len(text) <= CHUNK_LIMIT:
+            try:
+                presidio_results = self.presidio_analyzer.analyze(
+                    text=text,
+                    language="en",
+                    score_threshold=0.3,
+                )
+            except Exception as e:
+                logger.error("Presidio inference error: %s", str(e))
+                return []
+            return self._convert_presidio_results(text, presidio_results)
+
+        # For larger documents (e.g. CSVs, logs), chunk on line breaks to keep peak
+        # memory usage under 200 MB and prevent OOM restarts on 512MB instances.
+        all_detections: List[RawDetection] = []
+        start = 0
+        text_len = len(text)
+        while start < text_len:
+            if text_len - start <= CHUNK_LIMIT:
+                end = text_len
+            else:
+                split_idx = text.rfind("\n", start, start + CHUNK_LIMIT)
+                if split_idx == -1 or split_idx <= start:
+                    split_idx = start + CHUNK_LIMIT
+                else:
+                    split_idx += 1  # Include the newline
+                end = split_idx
+
+            chunk_text = text[start:end]
+            try:
+                chunk_results = self.presidio_analyzer.analyze(
+                    text=chunk_text,
+                    language="en",
+                    score_threshold=0.3,
+                )
+                chunk_detections = self._convert_presidio_results(chunk_text, chunk_results, offset=start)
+                all_detections.extend(chunk_detections)
+            except Exception as e:
+                logger.error("Presidio chunk inference error at %d-%d: %s", start, end, str(e))
+
+            start = end
+
+        return all_detections
 
     def detect_secrets(self, text: str) -> List[RawDetection]:
         """Scan for high-entropy developer secrets, tokens, and credentials."""

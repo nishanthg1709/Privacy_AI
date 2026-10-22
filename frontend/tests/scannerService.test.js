@@ -169,6 +169,7 @@ describe('Scanner Service & API Connectivity', () => {
       assert.equal(sentBody.task, 'Customer Support Audit');
       assert.equal(sentBody.privacy_mode, 'synthetic');
       assert.equal(sentBody.strictness, 'gdpr-hipaa');
+      assert.ok(sentBody.request_id && sentBody.request_id.startsWith('REQ-'));
 
       // Verify response normalization (not fabricated)
       assert.equal(result.scan_id, 'SCN-12345678');
@@ -204,6 +205,42 @@ describe('Scanner Service & API Connectivity', () => {
         () => scanPayload({ text: 'Confidential patient notes', maxRetries: 0 }),
         /Unable to connect to PrivacyGuard AI backend/
       );
+    });
+
+    it('throws clear timeout error without retrying when request exceeds scan timeout (AbortError)', async () => {
+      process.env.VITE_API_BASE_URL = 'https://api.test-privacyguard.com';
+      let attemptCount = 0;
+
+      globalThis.fetch = async () => {
+        attemptCount++;
+        const abortErr = new Error('The operation was aborted');
+        abortErr.name = 'AbortError';
+        throw abortErr;
+      };
+
+      await assert.rejects(
+        () => scanPayload({ text: 'Large data file scan', maxRetries: 2 }),
+        /Scan request timed out after 60s/
+      );
+      // Crucial: Must NOT retry non-idempotent scans on AbortError to prevent backend overload
+      assert.equal(attemptCount, 1);
+    });
+
+    it('respects custom VITE_SCAN_TIMEOUT_MS environment variable', async () => {
+      process.env.VITE_API_BASE_URL = 'https://api.test-privacyguard.com';
+      process.env.VITE_SCAN_TIMEOUT_MS = '45000';
+
+      globalThis.fetch = async () => {
+        const abortErr = new Error('The operation was aborted');
+        abortErr.name = 'AbortError';
+        throw abortErr;
+      };
+
+      await assert.rejects(
+        () => scanPayload({ text: 'Custom timeout document' }),
+        /Scan request timed out after 45s/
+      );
+      delete process.env.VITE_SCAN_TIMEOUT_MS;
     });
 
     it('retries successfully when transient network error occurs on first attempt', async () => {

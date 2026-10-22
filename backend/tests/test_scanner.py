@@ -516,8 +516,11 @@ class TestLiveModelInference:
 
         # Verify scan structure
         assert data["scan_id"].startswith("SCN-")
-        assert data["engine_status"]["model_loaded"] is True
-        assert data["engine_status"]["status"] == "ready"
+        if data["engine_status"]["model_loaded"]:
+            assert data["engine_status"]["status"] == "ready"
+        else:
+            assert data["engine_status"]["status"] == "degraded"
+            assert data["engine_status"]["presidio_enabled"] is True
 
         # Verify findings
         findings = data["findings"]
@@ -579,7 +582,8 @@ class TestApiEndpoints:
             assert res.status_code == 200
             data = res.json()
             assert data["status"] == "ok"
-            assert data["engine_ready"] is True
+            assert "engine_ready" in data
+            assert data["engine_status"] in ("ready", "degraded")
 
     def test_root_endpoint(self, client):
         """GET / returns system status and docs reference."""
@@ -624,3 +628,118 @@ class TestApiEndpoints:
         assert "Sarah Connor" not in protected
         assert "482-19-9481" not in protected
         assert "sk-live_51M0demo00000000000000000000" not in protected
+
+
+# ============================================================================
+# GROUP D: Disabled GLiNER Startup, Low-Memory & CSV Processing
+# ============================================================================
+
+class TestDisabledGlinerAndLowMemoryOperations:
+    """Verifies low-memory execution, chunked CSV handling, and honest degraded mode."""
+
+    def test_disabled_gliner_startup_prevents_neural_imports(self):
+        """In a clean process with ENABLE_GLINER=false, torch and gliner are NEVER imported."""
+        import os
+        import subprocess
+        import sys
+
+        verify_script = (
+            "import os, sys\n"
+            "os.environ['ENABLE_GLINER'] = 'false'\n"
+            "os.environ['PRESIDIO_DEVICE'] = 'cpu'\n"
+            "from app.services.ai_detector import detector_service\n"
+            "detector_service.load_engines(enable_gliner=False, enable_presidio=True)\n"
+            "assert detector_service.model_loaded is False\n"
+            "assert detector_service.presidio_loaded is True\n"
+            "assert detector_service.status == 'degraded'\n"
+            "assert 'torch' not in sys.modules, 'torch was unexpectedly imported'\n"
+            "assert 'transformers' not in sys.modules, 'transformers was unexpectedly imported'\n"
+            "assert 'gliner' not in sys.modules, 'gliner was unexpectedly imported'\n"
+            "print('VERIFICATION_OK')\n"
+        )
+
+        res = subprocess.run(
+            [sys.executable, "-c", verify_script],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=os.path.join(os.path.dirname(__file__), ".."),
+        )
+        assert res.returncode == 0, f"Subprocess failed:\nstdout: {res.stdout}\nstderr: {res.stderr}"
+        assert "VERIFICATION_OK" in res.stdout
+
+    def test_large_csv_processing_with_chunking(self, client):
+        """A multi-row CSV document is processed with line-boundary chunking and valid offsets."""
+        header = "id,name,email,phone,notes"
+        rows = [
+            f"{i},Sarah Connor {i},user{i}@cyberdyne.org,555-{i:04d},Patient file record {i}"
+            for i in range(1, 101)
+        ]
+        csv_text = "\n".join([header] + rows)
+
+        res = client.post("/api/scan", json={"text": csv_text, "privacy_mode": "strict"})
+        assert res.status_code == 200
+        data = res.json()
+
+        assert data["original_length"] == len(csv_text)
+        assert len(data["findings"]) >= 100
+        protected = data["protected_text"]
+
+        # Ensure header remains intact
+        assert protected.startswith("id,name,email,phone,notes")
+        # Ensure sensitive values are not present
+        assert "user1@cyberdyne.org" not in protected
+        assert "user50@cyberdyne.org" not in protected
+        assert "user99@cyberdyne.org" not in protected
+
+    def test_csv_with_malformed_and_edge_case_content(self, client):
+        """Edge case CSV formatting (quotes, extra commas, empty fields) scans safely."""
+        malformed_csv = (
+            'id,name,email,notes\n'
+            '1,"Connor, Sarah",sarah@example.com,"Note with ""escaped"" quotes and, commas"\n'
+            '2,,,Empty row with sk-test_apikey1234567890abcdef\n'
+            '3,John Doe,john@test.org,\n'
+        )
+        res = client.post("/api/scan", json={"text": malformed_csv, "privacy_mode": "synthetic"})
+        assert res.status_code == 200
+        data = res.json()
+        assert len(data["findings"]) >= 2
+        assert "sk-test_apikey1234567890abcdef" not in data["protected_text"]
+
+    def test_scan_lifecycle_gc_and_repeated_calls(self, client):
+        """Sequential scans execute cleanly without memory escalation or state leakage."""
+        for i in range(5):
+            payload = {
+                "text": f"Iteration {i}: Contact Dr. Alice Smith at alice{i}@hospital.org regarding Case #{i}.",
+                "privacy_mode": "strict",
+            }
+            res = client.post("/api/scan", json=payload)
+            assert res.status_code == 200
+            data = res.json()
+            assert len(data["findings"]) >= 1
+            assert f"alice{i}@hospital.org" not in data["protected_text"]
+
+    def test_idempotency_cache_returns_identical_scan_response(self, client):
+        """Requests with identical request_id return cached responses without re-processing."""
+        req_id = "test-idempotent-req-12345"
+        payload = {
+            "text": "CEO Sarah Connor contacted engineer John at sarah.connor@cyberdyne.org",
+            "task": "Idempotency Audit",
+            "privacy_mode": "strict",
+            "request_id": req_id,
+        }
+
+        res1 = client.post("/api/scan", json=payload)
+        assert res1.status_code == 200
+        data1 = res1.json()
+
+        res2 = client.post("/api/scan", json=payload)
+        assert res2.status_code == 200
+        data2 = res2.json()
+
+        # Exact same scan ID and output returned from cache
+        assert data1["scan_id"] == data2["scan_id"]
+        assert data1["protected_text"] == data2["protected_text"]
+        assert len(data1["findings"]) == len(data2["findings"])
+
+

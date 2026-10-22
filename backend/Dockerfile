@@ -13,6 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOST=0.0.0.0 \
     HOME=/home/user \
     SPACY_MODEL=en_core_web_sm \
+    PRESIDIO_DEVICE=cpu \
     ENABLE_GLINER=false
 
 # Install system dependencies (build tools, curl for healthcheck)

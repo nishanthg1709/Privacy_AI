@@ -14,9 +14,13 @@
  * - No service-role keys are ever used.
  */
 
-import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { supabase, isSupabaseConfigured } from './supabaseClient.js';
 
 class HistoryService {
+  constructor() {
+    this._persistedScanIds = new Set();
+  }
+
   /**
    * Persists minimal scan metadata to Supabase scan_history table.
    * Gracefully fails without disrupting the scan result if database is unavailable.
@@ -30,11 +34,31 @@ class HistoryService {
       return { saved: false, reason: 'unauthenticated' };
     }
 
+    const scanId = scanResult.scanId || scanResult.scan_id || `SCN-${Date.now()}`;
+
+    // Prevent duplicate submission in same session
+    if (this._persistedScanIds.has(scanId)) {
+      return { saved: true, deduplicated: true };
+    }
+
     if (!isSupabaseConfigured() || !supabase) {
       return { saved: false, reason: 'supabase_not_configured' };
     }
 
     try {
+      // Check if already persisted in database to prevent duplicate side effects
+      const { data: existing, error: checkError } = await supabase
+        .from('scan_history')
+        .select('id, scan_id')
+        .eq('user_id', user.id)
+        .eq('scan_id', scanId)
+        .limit(1);
+
+      if (!checkError && existing && existing.length > 0) {
+        this._persistedScanIds.add(scanId);
+        return { saved: true, deduplicated: true, record: existing[0] };
+      }
+
       // Aggregate category counts without retaining any raw entity strings
       const categoryCounts = (scanResult.findings || []).reduce((acc, f) => {
         const cat = f.category || 'General PII';
@@ -50,7 +74,7 @@ class HistoryService {
       // Clean metadata payload - zero sensitive text
       const minimalRecord = {
         user_id: user.id,
-        scan_id: scanResult.scanId || scanResult.scan_id || `SCN-${Date.now()}`,
+        scan_id: scanId,
         task: scanResult.taskName || scanResult.task || 'Prompt Privacy Audit',
         privacy_mode: scanResult.mode || scanResult.privacy_mode || 'strict',
         strictness: scanResult.strictness || 'gdpr-hipaa',
@@ -71,6 +95,7 @@ class HistoryService {
         return { saved: false, error: error.message };
       }
 
+      this._persistedScanIds.add(scanId);
       return { saved: true, record: data ? data[0] : null };
     } catch (err) {
       console.warn('[PrivacyGuard AI] Error in saveScanHistory:', err);

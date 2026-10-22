@@ -8,6 +8,7 @@ Provides:
 - Zero-log policy for sensitive documents and detected values
 """
 
+import gc
 import logging
 import re
 import uuid
@@ -58,81 +59,84 @@ class PrivacyEngine:
 
         logger.info("Initiating scan id=%s, task='%s', mode='%s', text_len=%d", scan_id, task_label, mode, len(text))
 
-        # 1. Primary detection pass using AI detector and complementary recognizers
-        raw_detections = self.detector.detect_all(text)
+        try:
+            # 1. Primary detection pass using AI detector and complementary recognizers
+            raw_detections = self.detector.detect_all(text)
 
-        # 2. Filter detections according to compliance strictness level
-        filtered_detections = self._apply_strictness_filter(raw_detections, strictness)
+            # 2. Filter detections according to compliance strictness level
+            filtered_detections = self._apply_strictness_filter(raw_detections, strictness)
 
-        # 3. Generate consistent placeholders and transform text according to privacy_mode
-        findings, protected_text = self._apply_protection_mode(
-            text=text,
-            detections=filtered_detections,
-            task=task_label,
-            privacy_mode=mode,
-        )
+            # 3. Generate consistent placeholders and transform text according to privacy_mode
+            findings, protected_text = self._apply_protection_mode(
+                text=text,
+                detections=filtered_detections,
+                task=task_label,
+                privacy_mode=mode,
+            )
 
-        # 4. Secondary verification pass over protected text
-        verification = self._verify_protected_text(
-            protected_text=protected_text,
-            original_detections=findings,
-            privacy_mode=mode,
-        )
+            # 4. Secondary verification pass over protected text
+            verification = self._verify_protected_text(
+                protected_text=protected_text,
+                original_detections=findings,
+                privacy_mode=mode,
+            )
 
-        # 5. Contextual combination risk analysis
-        combination_risks, quasi_identifiers = self._analyze_combination_risks(findings)
+            # 5. Contextual combination risk analysis
+            combination_risks, quasi_identifiers = self._analyze_combination_risks(findings)
 
-        # 6. Compute summary, metrics, and privacy score
-        counts = {
-            "total": len(findings),
-            "high": sum(1 for f in findings if f.risk == "High"),
-            "medium": sum(1 for f in findings if f.risk == "Medium"),
-            "low": sum(1 for f in findings if f.risk == "Low"),
-        }
-        categories = sorted(list({f.category for f in findings}))
-        actions = sorted(list({f.action for f in findings}))
-        privacy_score = self._compute_privacy_score(findings, verification)
-        summary = self._generate_summary(findings, mode, task_label, verification)
+            # 6. Compute summary, metrics, and privacy score
+            counts = {
+                "total": len(findings),
+                "high": sum(1 for f in findings if f.risk == "High"),
+                "medium": sum(1 for f in findings if f.risk == "Medium"),
+                "low": sum(1 for f in findings if f.risk == "Low"),
+            }
+            categories = sorted(list({f.category for f in findings}))
+            actions = sorted(list({f.action for f in findings}))
+            privacy_score = self._compute_privacy_score(findings, verification)
+            summary = self._generate_summary(findings, mode, task_label, verification)
 
-        engine_status = EngineStatus(
-            status=self.detector.status,
-            model_name=self.detector.model_name,
-            model_loaded=self.detector.model_loaded,
-            device=self.detector.device,
-            inference_backend="gliner_pytorch" if self.detector.model_loaded else "presidio_hybrid",
-            presidio_enabled=self.detector.presidio_loaded,
-            supported_categories=self.detector.get_supported_categories(),
-            error_message=self.detector.load_error,
-        )
+            engine_status = EngineStatus(
+                status=self.detector.status,
+                model_name=self.detector.model_name,
+                model_loaded=self.detector.model_loaded,
+                device=self.detector.device,
+                inference_backend="gliner_pytorch" if self.detector.model_loaded else "presidio_hybrid",
+                presidio_enabled=self.detector.presidio_loaded,
+                supported_categories=self.detector.get_supported_categories(),
+                error_message=self.detector.load_error,
+            )
 
-        logger.info(
-            "Scan %s complete: %d findings, %d high risk, verification passed=%s",
-            scan_id,
-            len(findings),
-            counts["high"],
-            verification.passed,
-        )
+            logger.info(
+                "Scan %s complete: %d findings, %d high risk, verification passed=%s",
+                scan_id,
+                len(findings),
+                counts["high"],
+                verification.passed,
+            )
 
-        return ScanResponse(
-            scan_id=scan_id,
-            timestamp=start_time,
-            privacy_mode=mode,
-            task=task_label,
-            original_length=len(text),
-            protected_length=len(protected_text),
-            protected_text=protected_text,
-            sanitized_text=protected_text,
-            findings=findings,
-            summary=summary,
-            counts=counts,
-            categories=categories,
-            actions=actions,
-            privacy_score=privacy_score,
-            engine_status=engine_status,
-            verification=verification,
-            combination_risks=combination_risks,
-            quasi_identifiers=quasi_identifiers,
-        )
+            return ScanResponse(
+                scan_id=scan_id,
+                timestamp=start_time,
+                privacy_mode=mode,
+                task=task_label,
+                original_length=len(text),
+                protected_length=len(protected_text),
+                protected_text=protected_text,
+                sanitized_text=protected_text,
+                findings=findings,
+                summary=summary,
+                counts=counts,
+                categories=categories,
+                actions=actions,
+                privacy_score=privacy_score,
+                engine_status=engine_status,
+                verification=verification,
+                combination_risks=combination_risks,
+                quasi_identifiers=quasi_identifiers,
+            )
+        finally:
+            gc.collect()
 
     def _apply_strictness_filter(
         self, detections: List[RawDetection], strictness: str
@@ -363,28 +367,38 @@ class PrivacyEngine:
         )
 
     def _build_protected_text(self, original_text: str, plans: List[Tuple[int, int, str, Finding]]) -> str:
-        """Construct new string with replaced spans using reverse offset substitution."""
-        # Sort plans in reverse order so character offsets remain valid throughout
-        sorted_plans = sorted(plans, key=lambda x: x[0], reverse=True)
-        chars = list(original_text)
-
+        """Construct new string with replaced spans using fast O(N) chunk accumulation."""
+        if not plans:
+            return original_text
+        sorted_plans = sorted(plans, key=lambda x: x[0])
+        parts = []
+        curr = 0
         for start, end, replacement, _ in sorted_plans:
-            chars[start:end] = list(replacement)
-
-        return "".join(chars)
+            if start > curr:
+                parts.append(original_text[curr:start])
+            parts.append(replacement)
+            curr = end
+        if curr < len(original_text):
+            parts.append(original_text[curr:])
+        return "".join(parts)
 
     def _build_user_approved_preview(
         self, original_text: str, plans: List[Tuple[int, int, str, Finding]]
     ) -> str:
         """In user-approved mode, generate a non-destructive preview with proposed markers."""
-        sorted_plans = sorted(plans, key=lambda x: x[0], reverse=True)
-        chars = list(original_text)
-
+        if not plans:
+            return original_text
+        sorted_plans = sorted(plans, key=lambda x: x[0])
+        parts = []
+        curr = 0
         for start, end, _, finding in sorted_plans:
-            marker = f"[PROPOSED_REDACT: {finding.type}_{finding.id}]"
-            chars[start:end] = list(marker)
-
-        return "".join(chars)
+            if start > curr:
+                parts.append(original_text[curr:start])
+            parts.append(f"[PROPOSED_REDACT: {finding.type}_{finding.id}]")
+            curr = end
+        if curr < len(original_text):
+            parts.append(original_text[curr:])
+        return "".join(parts)
 
     def _verify_protected_text(
         self,

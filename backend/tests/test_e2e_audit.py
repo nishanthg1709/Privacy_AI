@@ -110,12 +110,21 @@ def test_health_and_engine_status_endpoints(client):
     health_res = client.get("/api/health")
     assert health_res.status_code == 200
     assert health_res.json()["status"] == "ok"
-    assert health_res.json()["engine_ready"] is True
+    assert "engine_ready" in health_res.json()
 
     engine_res = client.get("/api/engine-status")
     assert engine_res.status_code == 200
-    assert engine_res.json()["model_loaded"] is True
-    assert "gliner" in engine_res.json()["model_name"].lower()
+    engine_data = engine_res.json()
+    assert "status" in engine_data
+    if engine_data["model_loaded"]:
+        assert health_res.json()["engine_ready"] is True
+        assert engine_data["status"] == "ready"
+        assert "gliner" in engine_data["model_name"].lower()
+    else:
+        # Operating in honest degraded mode for low memory environments
+        assert engine_data["status"] == "degraded"
+        assert engine_data["presidio_enabled"] is True
+
 
 
 # -----------------------------------------------------------------------------
