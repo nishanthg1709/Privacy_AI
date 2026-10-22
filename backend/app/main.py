@@ -220,10 +220,23 @@ async def scan_payload(payload: ScanRequest) -> ScanResponse:
             detail=f"Payload exceeds maximum allowed size of {MAX_PAYLOAD_CHARS} characters.",
         )
 
+    import time
+
+    start_perf = time.perf_counter()
+    correlation_id = payload.request_id or f"REQ-{int(time.time()*1000)}"
+
     # Check idempotency cache first
     if payload.request_id and payload.request_id in _idempotency_cache:
-        logger.info("Returning cached scan response for request_id=%s", payload.request_id)
+        logger.info("Scan cache hit | correlation_id=%s | returning cached response", correlation_id)
         return _idempotency_cache[payload.request_id]
+
+    logger.info(
+        "Scan started | correlation_id=%s | task=%s | mode=%s | chars=%d",
+        correlation_id,
+        payload.task or "Prompt Privacy Audit",
+        payload.privacy_mode or "strict",
+        len(payload.text),
+    )
 
     try:
         # Sequential processing lock to prevent memory spikes on Render 512MB instance
@@ -243,9 +256,26 @@ async def scan_payload(payload: ScanRequest) -> ScanResponse:
                 if len(_idempotency_cache) > _MAX_IDEMPOTENCY_CACHE:
                     _idempotency_cache.popitem(last=False)
 
+            elapsed_ms = (time.perf_counter() - start_perf) * 1000
+            logger.info(
+                "Scan completed | correlation_id=%s | scan_id=%s | duration_ms=%.1f | findings=%d | passed=%s",
+                correlation_id,
+                response.scan_id,
+                elapsed_ms,
+                len(response.findings),
+                response.verification.passed,
+            )
             return response
     except Exception as e:
-        logger.error("Scan processing failure: %s", str(e), exc_info=True)
+        elapsed_ms = (time.perf_counter() - start_perf) * 1000
+        logger.error(
+            "Scan failed | correlation_id=%s | duration_ms=%.1f | error_type=%s | error=%s",
+            correlation_id,
+            elapsed_ms,
+            type(e).__name__,
+            str(e),
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to complete privacy scan.",

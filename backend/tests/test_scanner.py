@@ -742,4 +742,40 @@ class TestDisabledGlinerAndLowMemoryOperations:
         assert data1["protected_text"] == data2["protected_text"]
         assert len(data1["findings"]) == len(data2["findings"])
 
+    def test_presidio_deferred_initialization_on_transient_startup_failure(self):
+        """If Presidio failed during initial container boot, ensure_presidio_loaded recovers it cleanly."""
+        from app.services.ai_detector import AIDetectorService
+        detector = AIDetectorService()
+        detector.presidio_loaded = False
+        detector.presidio_analyzer = None
+        detector.status = "error"
+
+        # Call ensure_presidio_loaded directly
+        recovered = detector.ensure_presidio_loaded()
+        assert recovered is True
+        assert detector.presidio_loaded is True
+        assert detector.presidio_analyzer is not None
+        assert detector.status == "degraded"
+
+        # Verify it can detect entities immediately after deferred recovery
+        detections = detector.detect_presidio("Call Sarah Connor at sarah@cyberdyne.org")
+        assert len(detections) >= 1
+
+    def test_secrets_fallback_when_both_neural_and_presidio_fail(self):
+        """Even if all ML engines are unavailable, deterministic secrets and rules still protect sensitive data."""
+        from app.services.ai_detector import AIDetectorService
+        detector = AIDetectorService()
+        detector.model_loaded = False
+        detector.gliner_model = None
+        detector.presidio_loaded = False
+        detector.presidio_analyzer = None
+
+        # Even with zero ML models, secrets rules must function
+        text = "AWS_SECRET=AKIAIOSFODNN7EXAMPLE and SK=sk-live_51M0demo00000000000000000000"
+        secrets = detector.detect_secrets(text)
+        assert len(secrets) >= 2
+        categories = {s.category for s in secrets}
+        assert "Developer Credentials" in categories
+
+
 

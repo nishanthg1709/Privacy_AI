@@ -137,7 +137,7 @@ export async function scanPayload({
   const envTimeout =
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SCAN_TIMEOUT_MS) ||
     (typeof globalThis !== 'undefined' && globalThis.process?.env?.VITE_SCAN_TIMEOUT_MS);
-  const timeoutMs = Number(envTimeout) > 0 ? Number(envTimeout) : 60000;
+  const timeoutMs = Number(envTimeout) > 0 ? Number(envTimeout) : 90000;
 
   const requestId = `REQ-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
@@ -181,7 +181,7 @@ export async function scanPayload({
       // Never retry non-idempotent scans on client timeout (AbortError) to avoid overloading backend
       if (err.name === 'AbortError') {
         throw new Error(
-          `Scan request timed out after ${timeoutMs / 1000}s. The backend may be busy or processing a large document. Please retry or scan smaller text chunks.`,
+          `Scan request timed out after ${timeoutMs / 1000}s. On free hosting, the backend server may have been waking from cold sleep (~50-90s). Please click "Scan and Protect" to retry now that the server is active.`,
           { cause: err }
         );
       }

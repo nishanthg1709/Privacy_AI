@@ -189,6 +189,7 @@ class AIDetectorService:
         self.status = "uninitialized"  # "ready" | "degraded" | "error"
         self._is_loading = False
         self._load_count = 0
+        self.spacy_model = os.getenv("SPACY_MODEL", "en_core_web_sm")
 
         # Supported target entity labels passed to contextual model
         self.target_labels = [
@@ -238,6 +239,9 @@ class AIDetectorService:
             nlp_configuration = {
                 "nlp_engine_name": "spacy",
                 "models": [{"lang_code": "en", "model_name": model_name}],
+                "ner_model_configuration": {
+                    "labels_to_ignore": ["CARDINAL", "ORDINAL"],
+                },
             }
             provider = NlpEngineProvider(nlp_configuration=nlp_configuration)
             nlp_engine = provider.create_engine()
@@ -251,7 +255,7 @@ class AIDetectorService:
             except Exception as pe:
                 logger.debug("Note on disabling parser: %s", pe)
 
-            return AnalyzerEngine(nlp_engine=nlp_engine)
+            return AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en"])
 
     def load_engines(
         self,
@@ -373,6 +377,22 @@ class AIDetectorService:
         cats.update({item["category"] for item in PRESIDIO_TYPE_MAP.values()})
         return sorted(list(cats))
 
+    def ensure_presidio_loaded(self) -> bool:
+        """Safely verify or deferred-initialize Presidio if startup suffered transient pressure."""
+        if self.presidio_loaded and self.presidio_analyzer is not None:
+            return True
+        try:
+            model_to_use = getattr(self, "spacy_model", "en_core_web_sm") or "en_core_web_sm"
+            self.presidio_analyzer = self._create_presidio_analyzer(model_name=model_to_use)
+            self.presidio_loaded = True
+            if self.status != "ready":
+                self.status = "degraded"
+            logger.info("Presidio deferred initialization succeeded.")
+            return True
+        except Exception as e:
+            logger.warning("Deferred Presidio initialization failed: %s", str(e))
+            return False
+
     def detect_gliner(self, text: str) -> List[RawDetection]:
         """Run real contextual inference using resident GLiNER model."""
         if not self.model_loaded or self.gliner_model is None:
@@ -460,7 +480,8 @@ class AIDetectorService:
     def detect_presidio(self, text: str) -> List[RawDetection]:
         """Run complementary pattern and checksum recognition via Microsoft Presidio."""
         if not self.presidio_loaded or self.presidio_analyzer is None:
-            return []
+            if not self.ensure_presidio_loaded():
+                return []
 
         # For smaller documents, analyze directly
         CHUNK_LIMIT = 4000
@@ -555,7 +576,7 @@ class AIDetectorService:
             all_raw.extend(gliner_detections)
 
         # 3. Presidio complementary analyzer
-        if self.presidio_loaded:
+        if self.presidio_loaded or self.ensure_presidio_loaded():
             presidio_detections = self.detect_presidio(text)
             all_raw.extend(presidio_detections)
 

@@ -63,16 +63,21 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isReadingFile, setIsReadingFile] = useState(false);
 
-  // Animate progress steps during active real scanning
+  const [scanElapsedSeconds, setScanElapsedSeconds] = useState(0);
+
+  // Animate progress steps and track duration during active real scanning
   useEffect(() => {
-    let t1, t2;
-    if (isScanning) {
-      t1 = setTimeout(() => setScanStep(2), 350);
-      t2 = setTimeout(() => setScanStep(3), 700);
-    }
+    if (!isScanning) return;
+    const t1 = setTimeout(() => setScanStep(2), 350);
+    const t2 = setTimeout(() => setScanStep(3), 700);
+    const interval = setInterval(() => {
+      setScanElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearInterval(interval);
     };
   }, [isScanning]);
 
@@ -246,6 +251,8 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
     }
 
     setIsScanning(true);
+    setScanElapsedSeconds(0);
+    setScanStep(1);
     setScanError(null);
     setScanResultNotice(null);
 
@@ -261,7 +268,6 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
         strictness: strictnessLevel,
       });
 
-      setIsScanning(false);
       setScanResultNotice({
         type: 'success',
         title: 'Backend Scan Complete',
@@ -274,11 +280,13 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
       // Forward directly to Results inspection
       handleGo('results', scanResult);
     } catch (err) {
-      setIsScanning(false);
       setScanError(
         err.message ||
         'Unable to connect to the PrivacyGuard AI backend. Please verify that the backend service is running and accessible.'
       );
+    } finally {
+      setIsScanning(false);
+      setScanStep(1);
     }
   };
 
@@ -678,7 +686,9 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
                 <div className="pg-active-header">
                   <h3 className="pg-active-title">Scanning Your Document</h3>
                   <p className="pg-active-sub">
-                    AI is analyzing your content for sensitive information...
+                    {scanElapsedSeconds >= 6
+                      ? `Connecting to backend (${scanElapsedSeconds}s)... On free hosting, waking the server from cold sleep can take up to 60-90s.`
+                      : 'AI is analyzing your content for sensitive information...'}
                   </p>
                 </div>
 
@@ -753,8 +763,8 @@ export default function PrivacyScanner({ onNavigate, onViewResults }) {
 
                 <h3 className="pg-ready-title">Privacy Engine Ready</h3>
                 <p className="pg-ready-description">
-                  Local neural model <code>urchade/gliner_small-v2.1</code> combined with Presidio recognizers
-                  is loaded in CPU memory. No document data is ever sent to external cloud APIs.
+                  Microsoft Presidio and spaCy <code>en_core_web_sm</code> with custom privacy rules
+                  are active in CPU memory (free-tier degraded mode; GLiNER neural AI is disabled to fit within 512MB RAM). No document data is ever sent to external cloud APIs.
                 </p>
 
                 <div className="pg-ready-metrics-box">

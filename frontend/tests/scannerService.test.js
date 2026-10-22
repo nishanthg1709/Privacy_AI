@@ -220,7 +220,7 @@ describe('Scanner Service & API Connectivity', () => {
 
       await assert.rejects(
         () => scanPayload({ text: 'Large data file scan', maxRetries: 2 }),
-        /Scan request timed out after 60s/
+        /Scan request timed out after 90s/
       );
       // Crucial: Must NOT retry non-idempotent scans on AbortError to prevent backend overload
       assert.equal(attemptCount, 1);
